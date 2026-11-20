@@ -2,114 +2,135 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../data/csv_backup_service.dart';
+import '../../widgets/ui.dart';
 
-/// Shows what a valid file contains. Resolves to true for "Replace with this
-/// file".
+/// "Import this file?" — what a valid file contains. Resolves to true for
+/// "Replace with this file".
 Future<bool> showImportSheet(
   BuildContext context,
   ImportPreview preview,
 ) async {
-  final result = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) {
-      final t = context.tokens;
-      final d = preview.data;
+  final d = preview.data;
+  final found = [
+    ('Days in split', '${d.dayCount}'),
+    ('Exercises', '${d.exerciseCount} (${d.setCount} sets)'),
+    ('Warm-up / cool-down items', '${d.warmupCount + d.cooldownCount}'),
+    ('Workouts in history', '${d.sessionCount}'),
+  ];
 
-      Widget line(IconData icon, String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: t.muted),
-            const SizedBox(width: 12),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
-          ],
-        ),
-      );
-
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Import this file?',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: t.ground,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.description_outlined, color: t.ink),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        preview.fileName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
+  final result = await showDesignSheet<bool>(
+    context,
+    builder: (sheet) {
+      final t = sheet.tokens;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Import this file?', style: grotesk(22, color: t.ink)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: t.ground,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.dark,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'CSV',
+                    style: inter(
+                      10,
+                      weight: FontWeight.w700,
+                      color: Fixed.white,
                     ),
-                    Text(
-                      fmtBytes(preview.sizeBytes),
-                      style: TextStyle(color: t.muted),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              line(
-                Icons.calendar_view_week_outlined,
-                '${d.dayCount} ${d.dayCount == 1 ? 'day' : 'days'}',
-              ),
-              line(
-                Icons.fitness_center,
-                '${d.exerciseCount} ${d.exerciseCount == 1 ? 'exercise' : 'exercises'}, '
-                '${d.setCount} ${d.setCount == 1 ? 'set' : 'sets'}',
-              ),
-              line(
-                Icons.self_improvement,
-                '${d.warmupCount} warm-up + ${d.cooldownCount} cool-down '
-                '${d.warmupCount + d.cooldownCount == 1 ? 'item' : 'items'}',
-              ),
-              line(
-                Icons.history,
-                '${d.sessionCount} ${d.sessionCount == 1 ? 'workout' : 'workouts'} in history',
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: t.danger.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'This replaces your current plan and history. '
-                  'Export first if you want to keep them.',
-                  style: TextStyle(
-                    color: t.danger,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Replace with this file'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        preview.fileName,
+                        style: inter(15, weight: FontWeight.w600, color: t.ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        fmtBytes(preview.sizeBytes),
+                        style: inter(13, color: t.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: t.divider)),
+            ),
+            child: Column(
+              children: [
+                for (final (label, value) in found)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: t.divider)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(label, style: inter(14, color: t.muted)),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          value,
+                          style: inter(
+                            14,
+                            weight: FontWeight.w700,
+                            color: t.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This replaces your current plan and history. '
+            'Export first if you want to keep a copy.',
+            style: inter(13, color: Fixed.dangerTitle),
+          ),
+          const SizedBox(height: 12),
+          Btn(
+            onTap: () => Navigator.pop(sheet, true),
+            height: 52,
+            color: t.dark,
+            child: Text(
+              'Replace with this file',
+              style: inter(15, weight: FontWeight.w700, color: Fixed.white),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Btn(
+            onTap: () => Navigator.pop(sheet, false),
+            height: 48,
+            child: Text(
+              'Cancel',
+              style: inter(15, weight: FontWeight.w600, color: t.ink),
+            ),
+          ),
+        ],
       );
     },
   );

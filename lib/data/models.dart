@@ -20,14 +20,19 @@ class DayPlan {
   Iterable<ExercisePlan> get exercises => parts.expand((p) => p.exercises);
   Iterable<ExerciseSet> get sets => exercises.expand((e) => e.sets);
 
+  /// Routine items with a name (blank rows are still being typed).
+  List<RoutineItem> get namedWarmups =>
+      warmups.where((r) => r.name.trim().isNotEmpty).toList();
+  List<RoutineItem> get namedCooldowns =>
+      cooldowns.where((r) => r.name.trim().isNotEmpty).toList();
+
   int get exerciseCount => exercises.length;
   int get setCount => sets.length;
   bool get canStart => exerciseCount > 0;
   bool get isEmpty => parts.isEmpty && warmups.isEmpty && cooldowns.isEmpty;
 
-  /// "Chest & Triceps", "Chest, Back & Arms". Only parts with exercises count.
-  String get partsLabel =>
-      joinAnd(parts.where((p) => p.exercises.isNotEmpty).map((p) => p.name));
+  /// "Chest & Triceps", "Chest, Back & Arms"; empty when no body parts.
+  String get partsLabel => joinAnd(parts.map((p) => p.name));
 }
 
 class BodyPartPlan {

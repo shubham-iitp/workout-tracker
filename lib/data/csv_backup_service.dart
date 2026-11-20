@@ -59,8 +59,8 @@ class CsvBackupService {
     final days = <BackupDay>[];
     for (final d in plan) {
       final day = BackupDay(d.name);
-      day.warmups.addAll(d.warmups.map(_routine));
-      day.cooldowns.addAll(d.cooldowns.map(_routine));
+      day.warmups.addAll(d.namedWarmups.map(_routine));
+      day.cooldowns.addAll(d.namedCooldowns.map(_routine));
       for (final p in d.parts) {
         // Body parts without exercises have no rows in the format.
         if (p.exercises.isEmpty) continue;

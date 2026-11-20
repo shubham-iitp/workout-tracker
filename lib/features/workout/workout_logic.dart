@@ -30,13 +30,18 @@ class WorkoutProgress {
   final List<String> doneOrder;
   final Set<String> done;
 
+  /// Warm-up / cool-down items with a name (blank rows are still being typed
+  /// in the editor and don't count).
+  List<RoutineItem> get warmups => day.namedWarmups;
+  List<RoutineItem> get cooldowns => day.namedCooldowns;
+
   bool isRoutineDone(RoutineItem r) => done.contains(routineKey(r.id));
   bool isSetDone(ExerciseSet s) => done.contains(setKey(s.id));
 
-  int get warmDone => day.warmups.where(isRoutineDone).length;
-  int get warmTotal => day.warmups.length;
-  int get coolDone => day.cooldowns.where(isRoutineDone).length;
-  int get coolTotal => day.cooldowns.length;
+  int get warmDone => warmups.where(isRoutineDone).length;
+  int get warmTotal => warmups.length;
+  int get coolDone => cooldowns.where(isRoutineDone).length;
+  int get coolTotal => cooldowns.length;
   int get setsDone => day.sets.where(isSetDone).length;
   int get setsTotal => day.setCount;
 
@@ -53,26 +58,29 @@ class WorkoutProgress {
   };
 
   bool isPhaseEmpty(String phase) => totalIn(phase) == 0;
-  bool isPhaseComplete(String phase) => doneIn(phase) >= totalIn(phase);
+  bool isPhaseComplete(String phase) =>
+      !isPhaseEmpty(phase) && doneIn(phase) >= totalIn(phase);
+
+  /// Phases that have something in them, in order.
+  List<String> get availablePhases =>
+      Phase.all.where((p) => !isPhaseEmpty(p)).toList();
 
   int get doneCount => warmDone + setsDone + coolDone;
   int get totalCount => warmTotal + setsTotal + coolTotal;
   bool get allDone => totalCount > 0 && doneCount >= totalCount;
-  double get fraction => totalCount == 0 ? 0 : doneCount / totalCount;
 
-  /// Next phase after [phase] that has something in it, or null.
+  /// Next phase after [phase] that still has unchecked items, or null.
   String? nextPhase(String phase) {
-    final i = Phase.all.indexOf(phase);
-    for (final p in Phase.all.skip(i + 1)) {
-      if (!isPhaseEmpty(p)) return p;
+    final avail = availablePhases;
+    final i = avail.indexOf(phase);
+    for (final p in avail.skip(i + 1)) {
+      if (doneIn(p) < totalIn(p)) return p;
     }
     return null;
   }
 
-  /// Exercises that improved on at least one *done* set.
-  int get liftsUp => day.exercises
-      .where((e) => e.sets.where(isSetDone).any(isSetImproved))
-      .length;
+  /// Exercises with a "vs last time" delta (the "N lifts up" count).
+  int get liftsUp => day.exercises.where((e) => exerciseDelta(e).isUp).length;
 
   double get volumeDoneKg =>
       day.sets.where(isSetDone).fold(0.0, (v, s) => v + s.weight * s.reps);
@@ -80,22 +88,27 @@ class WorkoutProgress {
 
 /// First phase with something in it.
 String firstPhase(DayPlan day) {
-  if (day.warmups.isNotEmpty) return Phase.warmup;
-  if (day.exerciseCount > 0) return Phase.lifts;
+  if (day.namedWarmups.isNotEmpty) return Phase.warmup;
+  if (day.setCount > 0) return Phase.lifts;
   return Phase.cooldown;
 }
 
+/// Weight shown in the "up" colour: heavier than last time.
 bool isWeightUp(ExerciseSet s) =>
     s.lastWeight != null && s.weight > s.lastWeight! + 1e-9;
 
-bool isRepsUp(ExerciseSet s) => s.lastReps != null && s.reps > s.lastReps!;
-
-/// A set "went up" when its weight or reps (shown green) beat last time.
-bool isSetImproved(ExerciseSet s) => isWeightUp(s) || isRepsUp(s);
+/// Reps shown in the "up" colour: at least as heavy and more reps.
+bool isRepsUp(ExerciseSet s) =>
+    s.lastWeight != null &&
+    s.lastReps != null &&
+    s.weight >= s.lastWeight! - 1e-9 &&
+    s.reps > s.lastReps!;
 
 /// What changed vs last time, for one exercise.
 sealed class Delta {
   const Delta();
+
+  bool get isUp => this is WeightUp || this is HeavierSets || this is RepsUp;
 }
 
 class FirstTime extends Delta {
@@ -120,8 +133,8 @@ class NoChange extends Delta {
   const NoChange();
 }
 
-/// "+X kg vs last time" if max weight rose, else "Heavier sets", else
-/// "+N reps".
+/// "+X kg vs last time" if the top weight rose, else "Heavier sets vs last
+/// time" if the sets are heavier overall, else "+N reps vs last time".
 Delta exerciseDelta(ExercisePlan e) {
   final withLast = e.sets.where((s) => s.lastWeight != null).toList();
   if (withLast.isEmpty) return const FirstTime();
@@ -129,10 +142,14 @@ Delta exerciseDelta(ExercisePlan e) {
   final maxNow = e.sets.map((s) => s.weight).reduce(math.max);
   final maxLast = withLast.map((s) => s.lastWeight!).reduce(math.max);
   if (maxNow > maxLast + 1e-9) return WeightUp(maxNow - maxLast);
-  if (withLast.any(isWeightUp)) return const HeavierSets();
 
-  final repsNow = withLast.fold(0, (n, s) => n + s.reps);
-  final repsLast = withLast.fold(0, (n, s) => n + (s.lastReps ?? s.reps));
-  if (repsNow > repsLast) return RepsUp(repsNow - repsLast);
+  final wDiff = withLast.fold(0.0, (t, s) => t + (s.weight - s.lastWeight!));
+  if (wDiff > 1e-9) return const HeavierSets();
+
+  final repDiff = withLast.fold(
+    0,
+    (t, s) => t + (s.reps - (s.lastReps ?? s.reps)),
+  );
+  if (repDiff > 0 && wDiff >= -1e-9) return RepsUp(repDiff);
   return const NoChange();
 }

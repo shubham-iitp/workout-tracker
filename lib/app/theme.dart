@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-/// The four colour palettes from the design. Screens only use [AppTokens],
-/// never raw colours.
+/// The four colour palettes from the design canvas ("Workout Tracker",
+/// MainThemed artboard). Screens only use [AppTokens], never raw colours.
 enum AppPalette {
   lime('Lime'),
   ocean('Ocean blue'),
@@ -18,144 +18,170 @@ enum AppPalette {
 
   AppTokens get tokens => switch (this) {
     AppPalette.lime => const AppTokens(
+      ink: Color(0xFF15171C),
+      dark: Color(0xFF15171C),
+      badge: Color(0xFF15171C),
+      ground: Color(0xFFF3F3EE),
+      muted: Color(0xFF5B606B),
+      line: Color(0xFFE2E2DA),
+      border: Color(0xFFD4D4CA),
+      border2: Color(0xFFC9C9BE),
+      divider: Color(0xFFEDEDE6),
+      field: Color(0xFFFAFAF7),
+      darkMuted: Color(0xFFA9ADB5),
+      darkText: Color(0xFFD6D8DC),
+      darkTrack: Color(0xFF2C2F36),
+      darkLine: Color(0xFF3A3D45),
+      checkIdle: Color(0xFFB5B5AA),
+      up: Color(0xFF3F6B00),
       accent: Color(0xFFC8F03C),
-      onAccent: Color(0xFF111111),
-      dark: Color(0xFF161616),
-      onDark: Color(0xFFFFFFFF),
-      ink: Color(0xFF111111),
-      muted: Color(0xFF6B6B66),
-      ground: Color(0xFFF4F4EF),
-      surface: Color(0xFFFFFFFF),
-      line: Color(0xFFE6E6DF),
-      border: Color(0xFFD6D6CE),
-      badge: Color(0xFFFF5A36),
-      up: Color(0xFF2E9E44),
-      danger: Color(0xFFD93025),
+      swatches: [
+        Color(0xFFC8F03C),
+        Color(0xFF15171C),
+        Color(0xFF5B606B),
+        Color(0xFFE2E2DA),
+        Color(0xFFF3F3EE),
+      ],
     ),
     AppPalette.ocean => const AppTokens(
-      accent: Color(0xFF4FB3FF),
-      onAccent: Color(0xFF0B1B2E),
-      dark: Color(0xFF0B2545),
-      onDark: Color(0xFFFFFFFF),
-      ink: Color(0xFF0B1B2E),
-      muted: Color(0xFF5C6B7A),
-      ground: Color(0xFFF1F6FB),
-      surface: Color(0xFFFFFFFF),
-      line: Color(0xFFDCE6F0),
-      border: Color(0xFFC9D6E3),
-      badge: Color(0xFFFF6B35),
-      up: Color(0xFF1F8A70),
-      danger: Color(0xFFD93025),
+      ink: Color(0xFF051923),
+      dark: Color(0xFF003554),
+      badge: Color(0xFF003554),
+      ground: Color(0xFFEAF3F9),
+      muted: Color(0xFF3D5A6C),
+      line: Color(0xFFD5E3EC),
+      border: Color(0xFFC3D6E2),
+      border2: Color(0xFFA9C3D3),
+      divider: Color(0xFFE3EDF3),
+      field: Color(0xFFF6FAFC),
+      darkMuted: Color(0xFF8FB3C8),
+      darkText: Color(0xFFC9DCE8),
+      darkTrack: Color(0xFF0A4A6E),
+      darkLine: Color(0xFF1B5778),
+      checkIdle: Color(0xFF8FAABB),
+      up: Color(0xFF006494),
+      accent: Color(0xFF00A6FB),
+      swatches: [
+        Color(0xFF00A6FB),
+        Color(0xFF0582CA),
+        Color(0xFF006494),
+        Color(0xFF003554),
+        Color(0xFF051923),
+      ],
     ),
     AppPalette.gold => const AppTokens(
-      accent: Color(0xFFE6B84A),
-      onAccent: Color(0xFF1C2326),
-      dark: Color(0xFF2A3439),
-      onDark: Color(0xFFFFFFFF),
-      ink: Color(0xFF1C2326),
-      muted: Color(0xFF6E7376),
-      ground: Color(0xFFF6F4EE),
-      surface: Color(0xFFFFFFFF),
-      line: Color(0xFFE5E1D6),
-      border: Color(0xFFD2CEC2),
-      badge: Color(0xFFB5452F),
-      up: Color(0xFF4E7D3A),
-      danger: Color(0xFFC0392B),
+      ink: Color(0xFF1E2019),
+      dark: Color(0xFF393E41),
+      badge: Color(0xFF587B7F),
+      ground: Color(0xFFEEECE8),
+      muted: Color(0xFF4E5356),
+      line: Color(0xFFD3D0CB),
+      border: Color(0xFFC4C0B9),
+      border2: Color(0xFFB3AFA7),
+      divider: Color(0xFFE4E1DC),
+      field: Color(0xFFF8F7F5),
+      darkMuted: Color(0xFFC9C6C1),
+      darkText: Color(0xFFE3E1DD),
+      darkTrack: Color(0xFF4C5256),
+      darkLine: Color(0xFF5A6064),
+      checkIdle: Color(0xFF9E9A92),
+      up: Color(0xFF476468),
+      accent: Color(0xFFE2C044),
+      swatches: [
+        Color(0xFFE2C044),
+        Color(0xFF393E41),
+        Color(0xFF587B7F),
+        Color(0xFFD3D0CB),
+        Color(0xFF1E2019),
+      ],
     ),
     AppPalette.rose => const AppTokens(
-      accent: Color(0xFF8EE3EF),
-      onAccent: Color(0xFF142B3E),
-      dark: Color(0xFF254E70),
-      onDark: Color(0xFFFFFFFF),
       ink: Color(0xFF142B3E),
-      muted: Color(0xFF557083),
-      ground: Color(0xFFEEFBF8),
-      surface: Color(0xFFFFFFFF),
-      line: Color(0xFFD5EDEA),
-      border: Color(0xFFBFDCD9),
+      dark: Color(0xFF254E70),
       badge: Color(0xFFC33C54),
+      ground: Color(0xFFEEFBF8),
+      muted: Color(0xFF44606F),
+      line: Color(0xFFD3E9E6),
+      border: Color(0xFFBFDCD8),
+      border2: Color(0xFFA3C9C5),
+      divider: Color(0xFFE2F3F0),
+      field: Color(0xFFF7FDFC),
+      darkMuted: Color(0xFFB6CFDF),
+      darkText: Color(0xFFD9E8F1),
+      darkTrack: Color(0xFF33628A),
+      darkLine: Color(0xFF3E6C92),
+      checkIdle: Color(0xFF93B5B2),
       up: Color(0xFF37718E),
-      danger: Color(0xFFC33C54),
+      accent: Color(0xFF8EE3EF),
+      swatches: [
+        Color(0xFFC33C54),
+        Color(0xFF254E70),
+        Color(0xFF37718E),
+        Color(0xFF8EE3EF),
+        Color(0xFFAEF3E7),
+      ],
     ),
   };
+}
+
+/// Colours shared by every palette.
+abstract final class Fixed {
+  static const white = Color(0xFFFFFFFF);
+  static const scrim = Color(0x8C15171C); // rgba(21,23,28,.55)
+  static const dangerText = Color(0xFFB42318);
+  static const dangerBorder = Color(0xFFF1C4BE);
+  static const dangerBg = Color(0xFFFDF0EE);
+  static const dangerTitle = Color(0xFF8A1C12);
 }
 
 @immutable
 class AppTokens extends ThemeExtension<AppTokens> {
   const AppTokens({
-    required this.accent,
-    required this.onAccent,
-    required this.dark,
-    required this.onDark,
     required this.ink,
-    required this.muted,
+    required this.dark,
+    required this.badge,
     required this.ground,
-    required this.surface,
+    required this.muted,
     required this.line,
     required this.border,
-    required this.badge,
+    required this.border2,
+    required this.divider,
+    required this.field,
+    required this.darkMuted,
+    required this.darkText,
+    required this.darkTrack,
+    required this.darkLine,
+    required this.checkIdle,
     required this.up,
-    required this.danger,
+    required this.accent,
+    required this.swatches,
   });
 
-  /// Highlight colour: primary buttons, progress, checked items.
-  final Color accent;
-  final Color onAccent;
-
-  /// Dark blocks: headers, secondary buttons.
-  final Color dark;
-  final Color onDark;
-
-  /// Main text.
   final Color ink;
-
-  /// Secondary text.
-  final Color muted;
-
-  /// Page background.
-  final Color ground;
-
-  /// Card background.
-  final Color surface;
-
-  /// Dividers.
-  final Color line;
-
-  /// Input / card outlines.
-  final Color border;
-
-  /// Count badges.
+  final Color dark;
   final Color badge;
-
-  /// "Higher than last time".
+  final Color ground;
+  final Color muted;
+  final Color line;
+  final Color border;
+  final Color border2;
+  final Color divider;
+  final Color field;
+  final Color darkMuted;
+  final Color darkText;
+  final Color darkTrack;
+  final Color darkLine;
+  final Color checkIdle;
   final Color up;
-
-  /// Errors and destructive actions.
-  final Color danger;
+  final Color accent;
+  final List<Color> swatches;
 
   @override
   AppTokens copyWith() => this;
 
   @override
-  AppTokens lerp(AppTokens? other, double t) {
-    if (other == null) return this;
-    Color l(Color a, Color b) => Color.lerp(a, b, t)!;
-    return AppTokens(
-      accent: l(accent, other.accent),
-      onAccent: l(onAccent, other.onAccent),
-      dark: l(dark, other.dark),
-      onDark: l(onDark, other.onDark),
-      ink: l(ink, other.ink),
-      muted: l(muted, other.muted),
-      ground: l(ground, other.ground),
-      surface: l(surface, other.surface),
-      line: l(line, other.line),
-      border: l(border, other.border),
-      badge: l(badge, other.badge),
-      up: l(up, other.up),
-      danger: l(danger, other.danger),
-    );
-  }
+  AppTokens lerp(AppTokens? other, double t) =>
+      (other == null || t < 0.5) ? this : other;
 }
 
 extension AppTokensX on BuildContext {
@@ -165,124 +191,68 @@ extension AppTokensX on BuildContext {
 const headingFont = 'SpaceGrotesk';
 const bodyFont = 'Inter';
 
+/// Space Grotesk heading style.
+TextStyle grotesk(
+  double size, {
+  FontWeight weight = FontWeight.w700,
+  Color? color,
+  double? letterSpacing,
+  double? height,
+  TextDecoration? decoration,
+}) => TextStyle(
+  fontFamily: headingFont,
+  fontSize: size,
+  fontWeight: weight,
+  color: color,
+  letterSpacing: letterSpacing == null ? null : letterSpacing * size,
+  height: height,
+  decoration: decoration,
+);
+
+/// Inter body style.
+TextStyle inter(
+  double size, {
+  FontWeight weight = FontWeight.w400,
+  Color? color,
+  double? letterSpacing,
+  double? height,
+  TextDecoration? decoration,
+}) => TextStyle(
+  fontFamily: bodyFont,
+  fontSize: size,
+  fontWeight: weight,
+  color: color,
+  letterSpacing: letterSpacing == null ? null : letterSpacing * size,
+  height: height,
+  decoration: decoration,
+);
+
 ThemeData buildTheme(AppPalette palette) {
   final t = palette.tokens;
-  final scheme = ColorScheme.light(
-    primary: t.dark,
-    onPrimary: t.onDark,
-    secondary: t.accent,
-    onSecondary: t.onAccent,
-    surface: t.surface,
-    onSurface: t.ink,
-    error: t.danger,
-    outline: t.border,
-    outlineVariant: t.line,
-  );
-  final base = ThemeData(
+  return ThemeData(
     useMaterial3: true,
-    colorScheme: scheme,
     fontFamily: bodyFont,
     scaffoldBackgroundColor: t.ground,
-    extensions: [t],
-  );
-  TextStyle? h(TextStyle? s) => s?.copyWith(
-    fontFamily: headingFont,
-    fontWeight: FontWeight.w700,
-    color: t.ink,
-  );
-  final text = base.textTheme;
-
-  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
-  return base.copyWith(
-    textTheme: text.copyWith(
-      displaySmall: h(text.displaySmall),
-      headlineLarge: h(text.headlineLarge),
-      headlineMedium: h(text.headlineMedium),
-      headlineSmall: h(text.headlineSmall),
-      titleLarge: h(text.titleLarge),
-      titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+    colorScheme: ColorScheme.light(
+      primary: t.dark,
+      onPrimary: Fixed.white,
+      secondary: t.accent,
+      onSecondary: t.ink,
+      surface: Fixed.white,
+      onSurface: t.ink,
+      error: Fixed.dangerText,
+      outline: t.border,
     ),
-    appBarTheme: AppBarTheme(
-      backgroundColor: t.ground,
-      foregroundColor: t.ink,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontFamily: headingFont,
-        fontWeight: FontWeight.w700,
-        fontSize: 22,
-        color: t.ink,
-      ),
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: t.ink,
+      selectionColor: t.accent.withValues(alpha: 0.5),
+      selectionHandleColor: t.ink,
     ),
-    cardTheme: CardThemeData(
-      color: t.surface,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: t.line),
-      ),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: t.accent,
-        foregroundColor: t.onAccent,
-        disabledBackgroundColor: t.line,
-        disabledForegroundColor: t.muted,
-        minimumSize: const Size(0, 48),
-        shape: shape,
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: t.ink,
-        side: BorderSide(color: t.border),
-        minimumSize: const Size(0, 48),
-        shape: shape,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-      ),
-    ),
-    textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: t.ink,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: t.surface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: t.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: t.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: t.dark, width: 2),
-      ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: t.surface,
-      indicatorColor: t.accent,
-      labelTextStyle: WidgetStatePropertyAll(
-        TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: t.ink),
-      ),
-      iconTheme: WidgetStatePropertyAll(IconThemeData(color: t.ink)),
-    ),
-    bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: t.surface,
-      showDragHandle: true,
-    ),
-    dividerTheme: DividerThemeData(color: t.line, space: 1),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: t.dark,
-      contentTextStyle: TextStyle(color: t.onDark),
+      contentTextStyle: inter(14, color: Fixed.white),
       behavior: SnackBarBehavior.floating,
     ),
+    extensions: [t],
   );
 }

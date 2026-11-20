@@ -87,3 +87,18 @@ final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
 );
 
 final unitProvider = Provider((ref) => ref.watch(settingsProvider).unit);
+
+// ---- UI state shared between screens -------------------------------------------
+
+/// Which History card is expanded (a session id). Set to the newest session
+/// right after a workout is saved.
+class ExpandedSessionNotifier extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void set(int? id) => state = id;
+}
+
+final expandedSessionProvider = NotifierProvider<ExpandedSessionNotifier, int?>(
+  ExpandedSessionNotifier.new,
+);

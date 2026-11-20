@@ -130,16 +130,19 @@ class PlanDao {
         );
   }
 
+  /// Updates only the fields given (name / detail / video link).
   Future<void> updateRoutineItem(
     int id, {
-    required String name,
-    required String detail,
+    String? name,
+    String? detail,
     String? videoUrl,
   }) => (db.update(db.routineItems)..where((t) => t.id.equals(id))).write(
     RoutineItemsCompanion(
-      name: Value(name),
-      detail: Value(detail),
-      videoUrl: Value(_blankToNull(videoUrl)),
+      name: name == null ? const Value.absent() : Value(name),
+      detail: detail == null ? const Value.absent() : Value(detail),
+      videoUrl: videoUrl == null
+          ? const Value.absent()
+          : Value(_blankToNull(videoUrl)),
     ),
   );
 
@@ -214,16 +217,16 @@ class PlanDao {
     });
   }
 
-  Future<void> updateExercise(
-    int id, {
-    required String name,
-    String? videoUrl,
-  }) => (db.update(db.exercises)..where((t) => t.id.equals(id))).write(
-    ExercisesCompanion(
-      name: Value(name),
-      videoUrl: Value(_blankToNull(videoUrl)),
-    ),
-  );
+  /// Updates only the fields given (name / video link).
+  Future<void> updateExercise(int id, {String? name, String? videoUrl}) =>
+      (db.update(db.exercises)..where((t) => t.id.equals(id))).write(
+        ExercisesCompanion(
+          name: name == null ? const Value.absent() : Value(name),
+          videoUrl: videoUrl == null
+              ? const Value.absent()
+              : Value(_blankToNull(videoUrl)),
+        ),
+      );
 
   Future<void> deleteExercise(int id) =>
       (db.delete(db.exercises)..where((t) => t.id.equals(id))).go();

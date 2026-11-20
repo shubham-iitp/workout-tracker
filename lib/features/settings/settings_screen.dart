@@ -1,26 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/format.dart';
 import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../data/csv_backup_service.dart';
-import '../../data/csv_codec.dart';
-import '../../widgets/dialogs.dart';
+import '../../widgets/ui.dart';
 import 'import_sheet.dart';
 
-/// Banner shown under "Your data" after an export / import.
+/// Banner under "Your data" after an export / import.
 class _Banner {
-  const _Banner({
-    required this.title,
-    required this.message,
-    this.error = false,
-  });
+  const _Banner({required this.title, required this.body, this.error = false});
 
   final String title;
-  final String message;
+  final String body;
   final bool error;
 }
+
+const _rowTypes = [
+  ('day', 'day name, position'),
+  ('routine', 'day, section (warmup / cooldown), name, detail, video_url'),
+  (
+    'set',
+    'day, body_part, exercise, set, weight_kg, reps, video_url, last_weight_kg, last_reps',
+  ),
+  (
+    'session',
+    'session_id, started_at, minutes, day, warm_done, warm_total, cool_done, cool_total',
+  ),
+  ('session_set', 'session_id, exercise, set, weight_kg, reps, improved'),
+];
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -32,25 +42,23 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   _Banner? _banner;
   bool _busy = false;
-  bool _formatExpanded = false;
+  bool _formatOpen = false;
 
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
-      final result = await ref.read(backupServiceProvider).exportAndShare();
+      final r = await ref.read(backupServiceProvider).exportAndShare();
       setState(
         () => _banner = _Banner(
-          title: 'Exported ${result.fileName}',
-          message: summaryShort(result.data),
+          title: 'Exported ${r.fileName}',
+          body:
+              '${summaryShort(r.data)}. Choose where to save or send it from the share sheet.',
         ),
       );
     } catch (e) {
       setState(
-        () => _banner = _Banner(
-          title: 'Export failed',
-          message: '$e',
-          error: true,
-        ),
+        () =>
+            _banner = _Banner(title: 'Export failed', body: '$e', error: true),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -66,19 +74,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await showImportSheet(context, preview);
       if (!ok) return;
       await service.replaceAll(preview.data);
+      final d = preview.data;
       setState(() {
-        _formatExpanded = false;
+        _formatOpen = false;
         _banner = _Banner(
           title: 'Imported ${preview.fileName}',
-          message: summaryShort(preview.data),
+          body:
+              'Your plan now has ${plural(d.dayCount, 'day')} and '
+              '${plural(d.exerciseCount, 'exercise')}, and history has '
+              '${plural(d.sessionCount, 'workout')}.',
         );
       });
     } on ImportFailure catch (e) {
       setState(() {
-        _formatExpanded = true;
+        _formatOpen = true;
         _banner = _Banner(
           title: "Couldn't import ${e.fileName}",
-          message: '${e.message}. Nothing was changed.',
+          body: '${e.message}. Nothing was changed.',
           error: true,
         );
       });
@@ -86,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(
         () => _banner = _Banner(
           title: 'Import failed',
-          message: '$e. Nothing was changed.',
+          body: '$e. Nothing was changed.',
           error: true,
         ),
       );
@@ -100,86 +112,211 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final t = context.tokens;
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
+    final h2 = inter(
+      12,
+      weight: FontWeight.w700,
+      letterSpacing: 0.1,
+      color: t.muted,
+    );
+
+    Widget sectionTitle(String title, [String? sub]) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: h2),
+        if (sub != null) ...[
+          const SizedBox(height: 2),
+          Text(sub, style: inter(13, color: t.muted)),
+        ],
+      ],
+    );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        children: [
-          const SectionHeader('Colour palette'),
-          for (final p in AppPalette.values) ...[
-            _PaletteTile(
-              palette: p,
-              selected: p == settings.palette,
-              onTap: () => notifier.setPalette(p),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            BackHeader(
+              title: 'Settings',
+              titleSize: 28,
+              onBack: () => context.pop(),
             ),
+            const SizedBox(height: 16),
+            sectionTitle(
+              'Colour palette',
+              'Applies to the whole app straight away.',
+            ),
+            const SizedBox(height: 10),
+            for (final p in AppPalette.values) ...[
+              _PaletteOption(
+                palette: p,
+                selected: p == settings.palette,
+                onTap: () => notifier.setPalette(p),
+              ),
+              const SizedBox(height: 8),
+            ],
             const SizedBox(height: 8),
-          ],
-          const SectionHeader(
-            'Weight unit',
-            subtitle: 'Weights are always stored in kg',
-          ),
-          SegmentedButton<WeightUnit>(
-            style: SegmentedButton.styleFrom(
-              selectedBackgroundColor: t.accent,
-              selectedForegroundColor: t.onAccent,
-              side: BorderSide(color: t.border),
-            ),
-            segments: const [
-              ButtonSegment(
-                value: WeightUnit.kg,
-                label: Text('Kilograms (kg)'),
+            sectionTitle('Weight unit'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Fixed.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: t.line),
               ),
-              ButtonSegment(value: WeightUnit.lb, label: Text('Pounds (lb)')),
-            ],
-            selected: {settings.unit},
-            onSelectionChanged: (s) => notifier.setUnit(s.first),
-          ),
-          const SectionHeader(
-            'Your data',
-            subtitle:
-                'Everything lives on this phone. Uninstalling the app '
-                'deletes it — export a backup first.',
-          ),
-          if (_banner != null) ...[
-            _BannerCard(
-              banner: _banner!,
-              onClose: () => setState(() => _banner = null),
+              child: Row(
+                children: [
+                  for (final (i, u) in WeightUnit.values.indexed) ...[
+                    if (i > 0) const SizedBox(width: 6),
+                    Expanded(
+                      child: Semantics(
+                        selected: u == settings.unit,
+                        child: Btn(
+                          onTap: () => notifier.setUnit(u),
+                          height: 44,
+                          radius: 10,
+                          color: u == settings.unit
+                              ? t.dark
+                              : Colors.transparent,
+                          child: Text(
+                            u.name,
+                            style: inter(
+                              15,
+                              weight: FontWeight.w700,
+                              color: u == settings.unit ? Fixed.white : t.ink,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _export,
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Export CSV'),
+            const SizedBox(height: 10),
+            Text(
+              'Weight + / − always moves by 0.1.',
+              style: inter(13, color: t.muted),
+            ),
+            const SizedBox(height: 16),
+            sectionTitle(
+              'Your data',
+              'Your plan and workout history, as one CSV file.',
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Btn(
+                    onTap: _busy ? null : _export,
+                    height: 52,
+                    color: t.dark,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: BtnLabel(
+                      'Export CSV',
+                      alignStart: true,
+                      gap: 10,
+                      style: inter(
+                        15,
+                        weight: FontWeight.w600,
+                        color: Fixed.white,
+                      ),
+                      leading: const SvgIcon(Ico.upload, color: Fixed.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Btn(
+                    onTap: _busy ? null : _import,
+                    height: 52,
+                    color: Fixed.white,
+                    border: BorderSide(color: t.border),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: BtnLabel(
+                      'Import CSV',
+                      alignStart: true,
+                      gap: 10,
+                      style: inter(15, weight: FontWeight.w600, color: t.ink),
+                      leading: SvgIcon(Ico.download, color: t.ink),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_banner != null) ...[
+              const SizedBox(height: 10),
+              _BannerBox(banner: _banner!),
+            ],
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                expanded: _formatOpen,
+                child: Btn(
+                  onTap: () => setState(() => _formatOpen = !_formatOpen),
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    _formatOpen ? 'Hide CSV format' : 'See CSV format',
+                    style: inter(
+                      14,
+                      weight: FontWeight.w600,
+                      color: t.ink,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _import,
-                  icon: const Icon(Icons.file_open_outlined),
-                  label: const Text('Import CSV'),
+            ),
+            if (_formatOpen) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: Fixed.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: t.line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'One row per item. The first column says what the row is:',
+                      style: inter(12, weight: FontWeight.w700, color: t.ink),
+                    ),
+                    for (final (code, text) in _rowTypes) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        code,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: t.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(text, style: inter(12, color: t.muted)),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Weights are stored in kg. Empty cells are allowed for anything optional.',
+                      style: inter(12, color: t.muted),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          _CsvFormatHelp(
-            expanded: _formatExpanded,
-            onToggle: () => setState(() => _formatExpanded = !_formatExpanded),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _PaletteTile extends StatelessWidget {
-  const _PaletteTile({
+class _PaletteOption extends StatelessWidget {
+  const _PaletteOption({
     required this.palette,
     required this.selected,
     required this.onTap,
@@ -193,198 +330,197 @@ class _PaletteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final p = palette.tokens;
-    Widget swatch(Color c) => Container(
-      width: 26,
-      height: 26,
-      margin: const EdgeInsets.only(right: 6),
-      decoration: BoxDecoration(
-        color: c,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.black12),
-      ),
-    );
-    return Material(
-      color: t.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: selected ? t.dark : t.line,
-          width: selected ? 2 : 1,
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      label: palette.label,
+      child: Material(
+        color: Fixed.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: selected
+              ? BorderSide(color: t.ink, width: 2)
+              : BorderSide(color: t.line),
         ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              swatch(p.accent),
-              swatch(p.dark),
-              swatch(p.badge),
-              swatch(p.ground),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  palette.label,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              if (selected) Icon(Icons.check_circle, color: t.dark),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BannerCard extends StatelessWidget {
-  const _BannerCard({required this.banner, required this.onClose});
-
-  final _Banner banner;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final bg = banner.error ? t.danger : t.dark;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            banner.error ? Icons.error_outline : Icons.check_circle,
-            color: banner.error ? Colors.white : t.accent,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 64),
+            padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+            child: Row(
               children: [
-                Text(
-                  banner.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                // Mini preview of the palette.
+                Container(
+                  width: 48,
+                  height: 48,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: p.ground,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: p.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 20,
+                        color: p.dark,
+                        padding: const EdgeInsets.fromLTRB(7, 0, 7, 5),
+                        alignment: Alignment.bottomLeft,
+                        child: Container(
+                          width: 28,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.accent,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(7, 6, 7, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Fixed.white,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: 26,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: p.accent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  banner.message,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        palette.label,
+                        style: inter(16, weight: FontWeight.w600, color: t.ink),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          for (final c in p.swatches) ...[
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: c,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0x1F000000),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? t.ink : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? t.ink : t.border2,
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? const SvgIcon(
+                          Ico.check,
+                          size: 14,
+                          color: Fixed.white,
+                          stroke: 3,
+                        )
+                      : null,
                 ),
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Dismiss',
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: onClose,
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _CsvFormatHelp extends StatelessWidget {
-  const _CsvFormatHelp({required this.expanded, required this.onToggle});
+class _BannerBox extends StatelessWidget {
+  const _BannerBox({required this.banner});
 
-  final bool expanded;
-  final VoidCallback onToggle;
+  final _Banner banner;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
-    Widget rule(String type, String cols) => Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(color: t.ink, fontSize: 13, fontFamily: bodyFont),
-          children: [
-            TextSpan(
-              text: type,
-              style: mono.copyWith(fontWeight: FontWeight.w700, color: t.ink),
-            ),
-            TextSpan(text: ' — $cols'),
-          ],
+    final err = banner.error;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: err ? Fixed.dangerBg : Fixed.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: err ? Fixed.dangerBorder : t.line),
         ),
-      ),
-    );
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            title: const Text(
-              'CSV format',
-              style: TextStyle(fontWeight: FontWeight.w600),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: err ? Fixed.dangerText : t.up,
+                shape: BoxShape.circle,
+              ),
+              child: SvgIcon(
+                err ? Ico.alert : Ico.check,
+                size: 12,
+                color: Fixed.white,
+                stroke: 3.2,
+              ),
             ),
-            trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more),
-            onTap: onToggle,
-          ),
-          if (expanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'A header row, then one row per item. Every row has exactly '
-                    '${csvColumns.length} columns; unused cells are empty. The first '
-                    'column says what the row is. Weights are always kg. Quote any '
-                    'cell that contains a comma.',
-                    style: TextStyle(color: t.muted, fontSize: 13),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: t.ground,
-                      borderRadius: BorderRadius.circular(10),
+                    banner.title,
+                    style: inter(
+                      14,
+                      weight: FontWeight.w700,
+                      color: err ? Fixed.dangerTitle : t.ink,
                     ),
-                    child: SelectableText(csvColumns.join(','), style: mono),
                   ),
-                  rule('day', 'day (name; row order = order)'),
-                  rule(
-                    'routine',
-                    'day, section (warmup / cooldown), exercise (item name), detail, video_url',
-                  ),
-                  rule(
-                    'set',
-                    'day, body_part, exercise, set (1, 2, …), weight_kg, reps, video_url, '
-                        'last_weight_kg, last_reps',
-                  ),
-                  rule(
-                    'session',
-                    'session_id, started_at (2026-11-16T06:55:00), minutes, day, '
-                        'body_part (parts label), set (planned sets), warm_done, warm_total, '
-                        'cool_done, cool_total',
-                  ),
-                  rule(
-                    'session_set',
-                    'session_id, exercise, set, weight_kg, reps, improved (true / false); '
-                        'must come after its session row',
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Up to $maxBackupDays days. Rows are counted with the header as row 1.',
-                    style: TextStyle(color: t.muted, fontSize: 13),
-                  ),
+                  const SizedBox(height: 2),
+                  Text(banner.body, style: inter(13, color: t.ink)),
                 ],
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

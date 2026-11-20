@@ -9,121 +9,53 @@ import '../../app/theme.dart';
 import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../widgets/async_view.dart';
-import '../../widgets/dialogs.dart';
-import '../../widgets/stepper_button.dart';
+import '../../widgets/ui.dart';
 
-class WorkoutsScreen extends ConsumerWidget {
+/// Tab 1 — "YOUR SPLIT / Workouts".
+class WorkoutsScreen extends ConsumerStatefulWidget {
   const WorkoutsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final plan = ref.watch(planProvider);
-    final active = ref
-        .watch(activeWorkoutProvider)
-        .when(data: (a) => a, loading: () => null, error: (_, _) => null);
-    final lastDayId = ref
-        .watch(historyProvider)
-        .when(
-          data: (h) => h.isEmpty ? null : h.first.session.dayId,
-          loading: () => null,
-          error: (_, _) => null,
-        );
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Workouts')),
-      body: AsyncView(
-        value: plan,
-        builder: (days) {
-          final nextId = _nextDayId(days, lastDayId);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            children: [
-              if (active != null) ...[
-                _ResumeBanner(
-                  dayName:
-                      days
-                          .where((d) => d.id == active.dayId)
-                          .firstOrNull
-                          ?.name ??
-                      'Workout',
-                ),
-                const SizedBox(height: 12),
-              ],
-              _RotationStepper(days: days),
-              const SizedBox(height: 12),
-              for (final day in days) ...[
-                _DayCard(
-                  day: day,
-                  isNext: day.id == nextId,
-                  hasActive: active != null,
-                ),
-                const SizedBox(height: 12),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  /// The day after the last one trained, among days that can be started.
-  static int? _nextDayId(List<DayPlan> days, int? lastDayId) {
-    final startable = days.where((d) => d.canStart).toList();
-    if (startable.isEmpty) return null;
-    final i = days.indexWhere((d) => d.id == lastDayId);
-    if (i < 0) return startable.first.id;
-    for (var k = 1; k <= days.length; k++) {
-      final d = days[(i + k) % days.length];
-      if (d.canStart) return d.id;
-    }
-    return null;
-  }
+  ConsumerState<WorkoutsScreen> createState() => _WorkoutsScreenState();
 }
 
-class _ResumeBanner extends StatelessWidget {
-  const _ResumeBanner({required this.dayName});
+class _WorkoutsScreenState extends ConsumerState<WorkoutsScreen> {
+  static bool _checkedResume = false;
 
-  final String dayName;
+  @override
+  void initState() {
+    super.initState();
+    // A workout that was in progress when the app was killed reopens on launch.
+    if (!_checkedResume) {
+      _checkedResume = true;
+      ref.read(workoutDaoProvider).getActive().then((active) {
+        if (active != null && mounted) context.push(Routes.workout);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Material(
-      color: t.dark,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.push(Routes.workout),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+    final plan = ref.watch(planProvider);
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: AsyncView(
+          value: plan,
+          builder: (days) => ListView(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
             children: [
-              Icon(Icons.timer_outlined, color: t.accent),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Workout in progress',
-                      style: TextStyle(
-                        color: t.onDark,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      dayName,
-                      style: TextStyle(color: t.onDark.withValues(alpha: 0.75)),
-                    ),
-                  ],
-                ),
+              ScreenHeader(
+                eyebrow: 'Your split',
+                title: 'Workouts',
+                onSettings: () => context.push(Routes.settings),
               ),
-              Text(
-                'Resume',
-                style: TextStyle(color: t.accent, fontWeight: FontWeight.w700),
-              ),
-              Icon(Icons.chevron_right, color: t.accent),
+              const SizedBox(height: 16),
+              _RotationCard(days: days),
+              for (final day in days) ...[
+                const SizedBox(height: 16),
+                _DayCard(day: day),
+              ],
             ],
           ),
         ),
@@ -132,8 +64,8 @@ class _ResumeBanner extends StatelessWidget {
   }
 }
 
-class _RotationStepper extends ConsumerWidget {
-  const _RotationStepper({required this.days});
+class _RotationCard extends ConsumerWidget {
+  const _RotationCard({required this.days});
 
   final List<DayPlan> days;
 
@@ -144,6 +76,7 @@ class _RotationStepper extends ConsumerWidget {
     final dao = ref.read(planDaoProvider);
 
     Future<void> remove() async {
+      if (n <= 1) return;
       final last = days.last;
       if (!last.isEmpty) {
         final ok = await confirmDialog(
@@ -153,149 +86,157 @@ class _RotationStepper extends ConsumerWidget {
               'Its warm-up, exercises and cool-down will be deleted. '
               'Past workouts stay in History.',
           confirm: 'Remove',
-          destructive: true,
         );
         if (!ok) return;
       }
       await dao.setDayCount(n - 1);
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$n-day rotation',
-                    style: const TextStyle(
-                      fontFamily: headingFont,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: t.dark,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Days in your split',
+                  style: inter(13, color: t.darkMuted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$n-day rotation',
+                  style: grotesk(
+                    15,
+                    weight: FontWeight.w600,
+                    color: Fixed.white,
                   ),
-                  Text(
-                    'Up to ${AppDatabase.maxDays} days',
-                    style: TextStyle(color: t.muted, fontSize: 13),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            StepperButton.minus(onPressed: n > 1 ? remove : null, size: 40),
-            const SizedBox(width: 8),
-            StepperButton.plus(
-              onPressed: n < AppDatabase.maxDays
-                  ? () => dao.setDayCount(n + 1)
-                  : null,
-              size: 40,
+          ),
+          IconBtn(
+            icon: Ico.minus,
+            label: 'Remove a day',
+            onTap: n > 1 ? remove : null,
+            border: BorderSide(color: t.darkLine),
+            color: Fixed.white,
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 40,
+            child: Text(
+              '$n',
+              textAlign: TextAlign.center,
+              style: grotesk(28, color: t.accent),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 6),
+          IconBtn(
+            icon: Ico.plus,
+            label: 'Add a day',
+            onTap: n < AppDatabase.maxDays
+                ? () => dao.setDayCount(n + 1)
+                : null,
+            background: t.accent,
+            color: t.ink,
+          ),
+        ],
       ),
     );
   }
 }
 
 class _DayCard extends ConsumerWidget {
-  const _DayCard({
-    required this.day,
-    required this.isNext,
-    required this.hasActive,
-  });
+  const _DayCard({required this.day});
 
   final DayPlan day;
-  final bool isNext;
-  final bool hasActive;
-
-  Future<void> _start(BuildContext context, WidgetRef ref) async {
-    if (hasActive) {
-      final ok = await confirmDialog(
-        context,
-        title: 'Start a new workout?',
-        message: 'The workout in progress will be discarded.',
-        confirm: 'Start new',
-        destructive: true,
-      );
-      if (!ok) return;
-    }
-    await ref.read(workoutDaoProvider).start(day);
-    if (context.mounted) context.push(Routes.workout);
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
-    final label = day.partsLabel;
-    final stats = [
-      plural(day.exerciseCount, 'exercise'),
-      plural(day.setCount, 'set'),
-      if (day.warmups.isNotEmpty) '${day.warmups.length} warm-up',
-      if (day.cooldowns.isNotEmpty) '${day.cooldowns.length} cool-down',
-    ].join(' · ');
+    final hasParts = day.parts.isNotEmpty;
+    final meta = hasParts
+        ? '${plural(day.parts.length, 'body part')} · '
+              '${plural(day.exerciseCount, 'exercise')} · '
+              '${plural(day.setCount, 'set')}'
+        : 'Tap Set up day to add body parts';
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    day.name,
-                    style: const TextStyle(
-                      fontFamily: headingFont,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                    ),
-                  ),
-                ),
-                if (isNext)
-                  Pill('Up next', background: t.accent, foreground: t.onAccent),
-              ],
+    return CardBox(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: t.badge,
+              borderRadius: BorderRadius.circular(6),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label.isEmpty ? 'Not set up yet' : label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: label.isEmpty ? t.muted : t.ink,
+            child: Text(
+              day.name.toUpperCase(),
+              style: inter(
+                11,
+                weight: FontWeight.w700,
+                letterSpacing: 0.08,
+                color: Fixed.white,
               ),
             ),
-            if (!day.isEmpty) ...[
-              const SizedBox(height: 4),
-              Text(stats, style: TextStyle(color: t.muted, fontSize: 13)),
-            ],
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push(Routes.day(day.id)),
-                    icon: Icon(
-                      day.isEmpty ? Icons.add : Icons.edit_outlined,
-                      size: 18,
-                    ),
-                    label: Text(day.isEmpty ? 'Set up day' : 'Edit'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasParts ? day.partsLabel : 'Not set up yet',
+            style: grotesk(
+              20,
+              weight: FontWeight.w600,
+              color: t.ink,
+              letterSpacing: -0.01,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(meta, style: inter(13, color: t.muted)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Btn(
+                  onTap: () => context.push(Routes.day(day.id)),
+                  height: 44,
+                  radius: 12,
+                  color: Fixed.white,
+                  border: BorderSide(color: t.border),
+                  child: Text(
+                    hasParts ? 'Edit' : 'Set up day',
+                    style: inter(14, weight: FontWeight.w600, color: t.ink),
                   ),
                 ),
-                const SizedBox(width: 10),
+              ),
+              if (day.canStart) ...[
+                const SizedBox(width: 8),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: day.canStart ? () => _start(context, ref) : null,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Start workout'),
+                  child: Btn(
+                    onTap: () async {
+                      await ref.read(workoutDaoProvider).start(day);
+                      if (context.mounted) context.push(Routes.workout);
+                    },
+                    height: 44,
+                    radius: 12,
+                    color: t.accent,
+                    child: BtnLabel(
+                      'Start workout',
+                      style: inter(14, weight: FontWeight.w700, color: t.ink),
+                      leading: SvgIcon(Ico.playFilled, size: 14, color: t.ink),
+                    ),
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }

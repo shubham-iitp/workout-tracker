@@ -36,13 +36,22 @@ lib/
   data/       drift tables (database.dart), daos/, CSV codec + backup service
   features/
     plan/     workouts_screen, day_editor_screen
-    workout/  active_workout_screen, quit_sheet, complete_screen, workout_logic
+    workout/  active_workout_screen (phases, quit sheet, complete card), workout_logic
     history/  history_screen
     settings/ settings_screen, import_sheet
-  widgets/    set_row, stepper_button, phase_stepper, dialogs
+  widgets/    ui (design icons, buttons, fields, sheets), async_view
 test/
   fixtures/   sample_valid.csv, sample_missing_reps.csv
-  csv_codec_test.dart, database_test.dart
+  csv_codec_test.dart, database_test.dart, screens_test.dart
+```
+
+The UI follows the "Workout Tracker" design canvas (MainThemed artboards):
+two tabs (Workouts, History), Settings behind the gear button, palette tokens
+copied exactly. To render every screen at 390×844 for comparison with the
+design:
+
+```sh
+flutter test test/screens_test.dart --update-goldens   # PNGs in build/screens/
 ```
 
 ## Setup (VS Code only, no Android Studio)

@@ -84,7 +84,7 @@ class WorkoutDao {
                 sessionId: sessionId,
                 position: position++,
                 name: exercise.name,
-                improved: Value(doneSets.any(isSetImproved)),
+                improved: Value(exerciseDelta(exercise).isUp),
               ),
             );
         for (var i = 0; i < doneSets.length; i++) {
