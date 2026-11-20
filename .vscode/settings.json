@@ -1,0 +1,6 @@
+{
+  "files.eol": "\n",
+  "[dart]": {
+    "editor.formatOnSave": true
+  }
+}
