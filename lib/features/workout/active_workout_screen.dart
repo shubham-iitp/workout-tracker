@@ -725,11 +725,6 @@ class _RoutineRow extends StatelessWidget {
                       decoration: done ? TextDecoration.lineThrough : null,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.detail.isEmpty ? ' ' : item.detail,
-                    style: inter(13, color: t.muted),
-                  ),
                 ],
               ),
             ),

@@ -351,7 +351,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
               Transform.translate(
                 offset: const Offset(10, 0),
                 child: IconBtn(
-                  icon: Ico.close,
+                  icon: Ico.trash,
                   label: 'Remove ${e.name}',
                   color: t.muted,
                   iconSize: 16,
@@ -414,7 +414,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
                   },
                 ),
                 IconBtn(
-                  icon: Ico.close,
+                  icon: Ico.trash,
                   label: 'Remove set ${i + 1}',
                   color: t.muted,
                   iconSize: 14,
@@ -577,7 +577,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
   }
 }
 
-/// Warm-up / cool-down card: icon tile, items (name · detail · video), add.
+/// Warm-up / cool-down card: icon tile, items (name · video link), add.
 class _RoutineCard extends ConsumerWidget {
   const _RoutineCard({required this.day, required this.kind});
 
@@ -661,23 +661,11 @@ class _RoutineCard extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      SizedBox(
-                        width: 104,
-                        child: SyncedField(
-                          value: item.detail,
-                          hint: 'e.g. 5 min',
-                          semanticLabel: 'Duration or reps for ${item.name}',
-                          onChanged: (v) =>
-                              dao.updateRoutineItem(item.id, detail: v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       IconBtn(
-                        icon: Ico.close,
+                        icon: Ico.trash,
                         label: 'Remove ${item.name}',
                         color: t.muted,
                         iconSize: 14,
-                        width: 36,
                         onTap: () => dao.deleteRoutineItem(item.id),
                       ),
                     ],

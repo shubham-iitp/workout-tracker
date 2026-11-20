@@ -20,7 +20,7 @@ class _Banner {
 
 const _rowTypes = [
   ('day', 'day name, position'),
-  ('routine', 'day, section (warmup / cooldown), name, detail, video_url'),
+  ('routine', 'day, section (warmup / cooldown), name, video_url'),
   (
     'set',
     'day, body_part, exercise, set, weight_kg, reps, video_url, last_weight_kg, last_reps',
