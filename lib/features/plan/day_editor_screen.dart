@@ -200,16 +200,37 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
             onSubmitted: (_) => _addPart(),
           ),
           const SizedBox(height: 10),
-          Btn(
-            onTap: _addPart,
-            height: 44,
-            radius: 12,
-            color: t.dark,
-            child: BtnLabel(
-              'Add body part',
-              style: inter(14, weight: FontWeight.w600, color: Fixed.white),
-              leading: const SvgIcon(Ico.plus, size: 16, color: Fixed.white),
-            ),
+          // Enabled only once something is typed in the box above.
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _partDraft,
+            builder: (context, value, _) {
+              final enabled = value.text.trim().isNotEmpty;
+              return Semantics(
+                enabled: enabled,
+                child: Opacity(
+                  opacity: enabled ? 1 : 0.4,
+                  child: Btn(
+                    onTap: enabled ? _addPart : null,
+                    height: 44,
+                    radius: 12,
+                    color: t.dark,
+                    child: BtnLabel(
+                      'Add body part',
+                      style: inter(
+                        14,
+                        weight: FontWeight.w600,
+                        color: Fixed.white,
+                      ),
+                      leading: const SvgIcon(
+                        Ico.plus,
+                        size: 16,
+                        color: Fixed.white,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

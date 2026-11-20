@@ -23,6 +23,7 @@ import 'package:workout_tracker/data/daos/workout_dao.dart';
 import 'package:workout_tracker/data/database.dart';
 import 'package:workout_tracker/features/workout/workout_logic.dart';
 import 'package:workout_tracker/main.dart';
+import 'package:workout_tracker/widgets/ui.dart';
 
 Future<void> loadFonts() async {
   Future<void> family(String name, List<String> files) async {
@@ -183,4 +184,49 @@ void main() {
     (t) =>
         shoot(t, '8-workouts-rose', location: Routes.workouts, palette: 'rose'),
   );
+
+  testWidgets('Add body part is enabled only when the box has text', (t) async {
+    t.view.physicalSize = const Size(390 * 3, 844 * 3);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final db = await seeded(t);
+    late int dayId;
+    await t.runAsync(() async => dayId = (await PlanDao(db).loadPlan())[1].id);
+
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [
+          prefsProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(db),
+        ],
+        child: const WorkoutTrackerApp(),
+      ),
+    );
+    appRouter.go(Routes.day(dayId));
+    for (var i = 0; i < 4; i++) {
+      await t.runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+      await t.pump(const Duration(milliseconds: 300));
+    }
+
+    Btn addButton() => t.widget<Btn>(
+      find.ancestor(of: find.text('Add body part'), matching: find.byType(Btn)),
+    );
+    final box = find.widgetWithText(TextField, 'e.g. Shoulders, Legs, Abs');
+
+    expect(addButton().onTap, isNull);
+    await t.enterText(box, '   ');
+    await t.pump();
+    expect(addButton().onTap, isNull, reason: 'spaces only');
+    await t.enterText(box, 'Legs');
+    await t.pump();
+    expect(addButton().onTap, isNotNull);
+    await t.enterText(box, '');
+    await t.pump();
+    expect(addButton().onTap, isNull);
+
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+  });
 }

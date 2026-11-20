@@ -1,0 +1,40 @@
+#!/bin/sh
+# Builds the release APK before every commit; the commit is aborted if the
+# build fails.
+#
+#   Enable once per clone:   git config core.hooksPath .githooks
+#   Skip for one commit:     SKIP_APK=1 git commit ...   (or git commit --no-verify)
+#
+# Output: build/app/outputs/flutter-apk/app-release.apk (git-ignored).
+
+if [ -n "$SKIP_APK" ]; then
+  echo "pre-commit: SKIP_APK set, not building the APK."
+  exit 0
+fi
+
+# Git GUIs (e.g. VS Code) may run hooks with a reduced PATH.
+if ! command -v flutter >/dev/null 2>&1; then
+  for dir in "$FLUTTER_ROOT/bin" "/c/src/flutter/bin" "$HOME/flutter/bin" "$HOME/development/flutter/bin"; do
+    if [ -x "$dir/flutter" ] || [ -f "$dir/flutter.bat" ]; then
+      PATH="$dir:$PATH"
+      break
+    fi
+  done
+fi
+if ! command -v flutter >/dev/null 2>&1; then
+  echo "pre-commit: flutter not found on PATH, can't build the APK." >&2
+  echo "            Add Flutter to PATH, or commit with SKIP_APK=1." >&2
+  exit 1
+fi
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+echo "pre-commit: building release APK (flutter build apk --release)..."
+if ! flutter build apk --release; then
+  echo "" >&2
+  echo "pre-commit: APK build failed, commit aborted." >&2
+  echo "            Fix the build, or commit with SKIP_APK=1 to skip it." >&2
+  exit 1
+fi
+
+echo "pre-commit: APK ready at build/app/outputs/flutter-apk/app-release.apk"

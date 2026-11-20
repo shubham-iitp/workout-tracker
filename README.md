@@ -102,6 +102,19 @@ Release builds are signed with the debug key for now. Before you share the app
 widely or publish it, create your own keystore and keep it, plus
 `key.properties`, out of git (both are already in `.gitignore`).
 
+### Commit hook: build the APK on every commit
+
+`.githooks/pre-commit` runs `flutter build apk --release` before each commit
+and aborts the commit if the build fails. Turn it on once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+A build takes a few minutes. To skip it for one commit, use
+`SKIP_APK=1 git commit ...` or `git commit --no-verify`. The APK is
+git-ignored, so it is never committed itself.
+
 ### Try CSV import
 
 ```sh
