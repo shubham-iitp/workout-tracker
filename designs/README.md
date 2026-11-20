@@ -10,6 +10,19 @@ downloaded on 2026-11-21. The app's UI is built to match these.
 | `<Palette><Screen>.dc.html` | One screen in one state, e.g. `WarmupActive`, `LiftsDone`, `QuitSheet`, `History`, `EditAddExercise`. Prefixless = Lime; `Ocean…`, `Gold…`, `Rose…` = other palettes; `Switch…` = the switchable-palette page (Settings, export/import states). These are thin wrappers that import a `Main*` file with demo props. |
 | `canvas.json` | Canvas layout: artboard positions and sizes, pages, and the notes (screen behaviour, data model, CSV format). |
 
+## Images
+
+`images/` has PNG exports of the artboards (780×1688, i.e. the 390×844 phone
+frame at 2×), one folder per palette:
+
+| Folder | Palette | Screens |
+|---|---|---|
+| `images/lime/` | Lime | 1.1–1.6 plan / edit / history, 2.1–2.8 workout flow |
+| `images/ocean/` | Ocean blue | same 14 screens |
+| `images/gold/` | Gold & gunmetal | same 14 screens |
+| `images/rose/` | Rosewood & aqua | same 14 screens |
+| `images/switchable/` | Switchable palette | 1–10: gear → Settings, palette & unit, export / import states |
+
 ## Viewing
 
 These are Design Component (`.dc.html`) files. They load `./support.js`, the
