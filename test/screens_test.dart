@@ -229,4 +229,121 @@ void main() {
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 1));
   });
+
+  group('Day editor asks before leaving with unsaved changes', () {
+    Future<(AppDatabase, int)> openEditor(WidgetTester t) async {
+      t.view.physicalSize = const Size(390 * 3, 844 * 3);
+      t.view.devicePixelRatio = 3;
+      addTearDown(t.view.reset);
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final db = await seeded(t);
+      late int dayId;
+      await t.runAsync(
+        () async => dayId = (await PlanDao(db).loadPlan()).first.id,
+      );
+      await t.pumpWidget(
+        ProviderScope(
+          overrides: [
+            prefsProvider.overrideWithValue(prefs),
+            databaseProvider.overrideWithValue(db),
+          ],
+          child: const WorkoutTrackerApp(),
+        ),
+      );
+      appRouter.go(Routes.workouts);
+      await settle(t);
+      appRouter.push(Routes.day(dayId));
+      await settle(t);
+      return (db, dayId);
+    }
+
+    Finder back() => find.byWidgetPredicate(
+      (w) => w is IconBtn && w.label == 'Back to workouts',
+    );
+
+    Future<void> tapBack(WidgetTester t) async {
+      await t.tap(back());
+      await settle(t);
+    }
+
+    Future<void> done(WidgetTester t) async {
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('no edits: back leaves straight away', (t) async {
+      await openEditor(t);
+      await tapBack(t);
+      expect(find.text('Save changes'), findsNothing);
+      expect(find.text('YOUR SPLIT'), findsOneWidget);
+      await done(t);
+    });
+
+    testWidgets('edit, back, discard restores the plan', (t) async {
+      final (db, _) = await openEditor(t);
+      final reps = find.byWidgetPredicate(
+        (w) => w is SyncedField && w.semanticLabel == 'Bench press set 1 reps',
+      );
+      await t.enterText(
+        find.descendant(of: reps, matching: find.byType(TextField)),
+        '12',
+      );
+      await settle(t);
+      await tapBack(t);
+
+      expect(find.text('Save changes to Day 1?'), findsOneWidget);
+      expect(find.text('You made 1 change:'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Bench press · set 1: 60×8 to 60×12'),
+        findsOneWidget,
+      );
+
+      if (autoUpdateGoldenFiles) {
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile('../build/screens/9-save-changes-sheet.png'),
+        );
+      }
+      await t.tap(find.text('Discard changes'));
+      await settle(t);
+      expect(find.text('YOUR SPLIT'), findsOneWidget);
+      expect(find.text('Changes to Day 1 discarded'), findsOneWidget);
+      late int savedReps;
+      await t.runAsync(() async {
+        savedReps = (await PlanDao(db).loadPlan()).first.sets.first.reps;
+      });
+      expect(savedReps, 8);
+      await done(t);
+    });
+
+    testWidgets('edit, back, save keeps the change', (t) async {
+      final (db, _) = await openEditor(t);
+      final reps = find.byWidgetPredicate(
+        (w) => w is SyncedField && w.semanticLabel == 'Bench press set 1 reps',
+      );
+      await t.enterText(
+        find.descendant(of: reps, matching: find.byType(TextField)),
+        '12',
+      );
+      await settle(t);
+      await tapBack(t);
+      await t.tap(find.text('Save changes'));
+      await settle(t);
+      expect(find.text('Day 1 saved · 1 change'), findsOneWidget);
+      late int savedReps;
+      await t.runAsync(() async {
+        savedReps = (await PlanDao(db).loadPlan()).first.sets.first.reps;
+      });
+      expect(savedReps, 12);
+      await done(t);
+    });
+  });
+}
+
+Future<void> settle(WidgetTester t) async {
+  for (var i = 0; i < 5; i++) {
+    await t.runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+    await t.pump(const Duration(milliseconds: 300));
+  }
 }

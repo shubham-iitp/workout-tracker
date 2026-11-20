@@ -269,6 +269,38 @@ class PlanDao {
         ),
       );
 
+  // ---- Undo a whole editing session ---------------------------------------------
+
+  /// Puts one day back exactly as [snapshot] (taken when the editor opened):
+  /// same rows, ids, order, weights, reps and "last time" values. Used by
+  /// "Discard changes".
+  Future<void> restoreDay(DayPlan snapshot) async {
+    final dayId = snapshot.id;
+    await db.transaction(() async {
+      await (db.update(db.splitDays)..where((t) => t.id.equals(dayId))).write(
+        SplitDaysCompanion(name: Value(snapshot.name)),
+      );
+      await (db.delete(
+        db.routineItems,
+      )..where((t) => t.dayId.equals(dayId))).go();
+      // Cascades to the day's exercises and sets.
+      await (db.delete(db.bodyParts)..where((t) => t.dayId.equals(dayId))).go();
+
+      for (final r in [...snapshot.warmups, ...snapshot.cooldowns]) {
+        await db.into(db.routineItems).insert(r);
+      }
+      for (final p in snapshot.parts) {
+        await db.into(db.bodyParts).insert(p.part);
+        for (final e in p.exercises) {
+          await db.into(db.exercises).insert(e.exercise);
+          for (final s in e.sets) {
+            await db.into(db.exerciseSets).insert(s);
+          }
+        }
+      }
+    });
+  }
+
   // ---- Helpers ----------------------------------------------------------------
 
   Future<int> _nextPosition(

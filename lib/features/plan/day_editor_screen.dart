@@ -12,6 +12,7 @@ import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/ui.dart';
+import 'plan_diff.dart';
 
 /// Edit one day: warm-up, body parts → exercises → sets, cool-down.
 class DayEditorScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,148 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
   final _draftWeight = TextEditingController();
   final _draftVideo = TextEditingController();
   final _partDraft = TextEditingController();
+
+  /// The day as it was when the editor opened. Edits are written straight to
+  /// the database; leaving asks to keep them or put this snapshot back.
+  DayPlan? _snapshot;
+  bool _leaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(planDaoProvider).loadPlan().then((days) {
+      if (!mounted) return;
+      setState(
+        () => _snapshot = days.where((d) => d.id == widget.dayId).firstOrNull,
+      );
+    });
+  }
+
+  /// Back arrow / system back: no changes → leave; otherwise ask.
+  Future<void> _confirmLeave() async {
+    if (_leaving) return;
+    _leaving = true;
+    try {
+      FocusScope.of(context).unfocus();
+      final snapshot = _snapshot;
+      final dao = ref.read(planDaoProvider);
+      // Reads after any edit still being written, so the list is complete.
+      final now = (await dao.loadPlan())
+          .where((d) => d.id == widget.dayId)
+          .firstOrNull;
+      if (!mounted) return;
+      if (snapshot == null || now == null) {
+        context.pop();
+        return;
+      }
+      final changes = describeDayChanges(snapshot, now, ref.read(unitProvider));
+      if (changes.isEmpty) {
+        context.pop();
+        return;
+      }
+
+      final choice = await _showSaveSheet(now.name, changes);
+      if (!mounted || choice == null || choice == _Leave.keepEditing) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (choice == _Leave.discard) {
+        await dao.restoreDay(snapshot);
+        if (!mounted) return;
+        context.pop();
+        messenger.showSnackBar(
+          SnackBar(content: Text('Changes to ${snapshot.name} discarded')),
+        );
+      } else {
+        context.pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '${now.name} saved · ${plural(changes.length, 'change')}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _leaving = false;
+    }
+  }
+
+  Future<_Leave?> _showSaveSheet(String dayName, List<String> changes) {
+    final t = context.tokens;
+    return showDesignSheet<_Leave>(
+      context,
+      builder: (sheet) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Save changes to $dayName?', style: grotesk(22, color: t.ink)),
+          const SizedBox(height: 6),
+          Text(
+            'You made ${plural(changes.length, 'change')}:',
+            style: inter(14, color: t.muted),
+          ),
+          const SizedBox(height: 10),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheet).height * 0.4,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: t.ground,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                itemCount: changes.length,
+                separatorBuilder: (_, _) =>
+                    Divider(height: 1, color: t.divider),
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  child: _ChangeLine(changes[i]),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Btn(
+            onTap: () => Navigator.pop(sheet, _Leave.save),
+            height: 52,
+            color: t.dark,
+            child: Text(
+              'Save changes',
+              style: inter(15, weight: FontWeight.w700, color: Fixed.white),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Btn(
+            onTap: () => Navigator.pop(sheet, _Leave.discard),
+            height: 52,
+            color: Fixed.white,
+            border: const BorderSide(color: Fixed.dangerBorder),
+            child: Text(
+              'Discard changes',
+              style: inter(
+                15,
+                weight: FontWeight.w700,
+                color: Fixed.dangerText,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Btn(
+            onTap: () => Navigator.pop(sheet, _Leave.keepEditing),
+            height: 48,
+            child: Text(
+              'Keep editing',
+              style: inter(15, weight: FontWeight.w600, color: t.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -92,90 +235,100 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
     final plan = ref.watch(planProvider);
     final t = context.tokens;
 
-    return Scaffold(
-      body: SafeArea(
-        child: AsyncView(
-          value: plan,
-          builder: (days) {
-            final day = days.where((d) => d.id == widget.dayId).firstOrNull;
-            if (day == null) {
-              return Center(
-                child: Text(
-                  'This day no longer exists.',
-                  style: inter(15, color: t.muted),
-                ),
-              );
-            }
-            final meta = day.parts.isNotEmpty
-                ? '${plural(day.parts.length, 'body part')} · '
-                      '${plural(day.exerciseCount, 'exercise')} · '
-                      '${plural(day.setCount, 'set')}'
-                : 'Add your first body part below';
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: AsyncView(
+            value: plan,
+            builder: (days) {
+              final day = days.where((d) => d.id == widget.dayId).firstOrNull;
+              if (day == null) {
+                return Center(
+                  child: Text(
+                    'This day no longer exists.',
+                    style: inter(15, color: t.muted),
+                  ),
+                );
+              }
+              final meta = day.parts.isNotEmpty
+                  ? '${plural(day.parts.length, 'body part')} · '
+                        '${plural(day.exerciseCount, 'exercise')} · '
+                        '${plural(day.setCount, 'set')}'
+                  : 'Add your first body part below';
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              children: [
-                BackHeader(
-                  title: day.name,
-                  subtitle: meta,
-                  backLabel: 'Back to workouts',
-                  onBack: () => context.pop(),
-                ),
-                const SizedBox(height: 16),
-                _RoutineCard(day: day, kind: RoutineKind.warmup),
-                if (day.parts.isEmpty) ...[
-                  const SizedBox(height: 16),
-                  CardBox(
-                    dashed: true,
-                    color: Colors.transparent,
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Text(
-                          'No body parts yet',
-                          style: grotesk(17, color: t.ink),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Add one below (for example Chest), then add exercises and '
-                          'sets to it. You need at least one exercise to start this day.',
-                          textAlign: TextAlign.center,
-                          style: inter(13, color: t.muted),
-                        ),
-                      ],
-                    ),
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                children: [
+                  BackHeader(
+                    title: day.name,
+                    subtitle: meta,
+                    backLabel: 'Back to workouts',
+                    onBack: _confirmLeave,
                   ),
-                ],
-                for (final part in day.parts) ...[
                   const SizedBox(height: 16),
-                  _partCard(context, part),
-                ],
-                const SizedBox(height: 16),
-                _addPartCard(context),
-                const SizedBox(height: 16),
-                _RoutineCard(day: day, kind: RoutineKind.cooldown),
-                if (day.canStart) ...[
-                  const SizedBox(height: 16),
-                  Btn(
-                    onTap: () async {
-                      await ref.read(workoutDaoProvider).start(day);
-                      if (context.mounted) {
-                        context.pushReplacement(Routes.workout);
-                      }
-                    },
-                    height: 52,
-                    color: t.accent,
-                    child: BtnLabel(
-                      'Start ${day.name}',
-                      style: inter(15, weight: FontWeight.w700, color: t.ink),
-                      leading: SvgIcon(Ico.playFilled, size: 14, color: t.ink),
-                      gap: 8,
+                  _RoutineCard(day: day, kind: RoutineKind.warmup),
+                  if (day.parts.isEmpty) ...[
+                    const SizedBox(height: 16),
+                    CardBox(
+                      dashed: true,
+                      color: Colors.transparent,
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Text(
+                            'No body parts yet',
+                            style: grotesk(17, color: t.ink),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Add one below (for example Chest), then add exercises and '
+                            'sets to it. You need at least one exercise to start this day.',
+                            textAlign: TextAlign.center,
+                            style: inter(13, color: t.muted),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
+                  for (final part in day.parts) ...[
+                    const SizedBox(height: 16),
+                    _partCard(context, part),
+                  ],
+                  const SizedBox(height: 16),
+                  _addPartCard(context),
+                  const SizedBox(height: 16),
+                  _RoutineCard(day: day, kind: RoutineKind.cooldown),
+                  if (day.canStart) ...[
+                    const SizedBox(height: 16),
+                    Btn(
+                      onTap: () async {
+                        await ref.read(workoutDaoProvider).start(day);
+                        if (context.mounted) {
+                          context.pushReplacement(Routes.workout);
+                        }
+                      },
+                      height: 52,
+                      color: t.accent,
+                      child: BtnLabel(
+                        'Start ${day.name}',
+                        style: inter(15, weight: FontWeight.w700, color: t.ink),
+                        leading: SvgIcon(
+                          Ico.playFilled,
+                          size: 14,
+                          color: t.ink,
+                        ),
+                        gap: 8,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -717,6 +870,42 @@ class _RoutineCard extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+enum _Leave { save, discard, keepEditing }
+
+/// One line of the change list. "A → B" is drawn with the app's arrow icon,
+/// because the bundled fonts don't include the → glyph.
+class _ChangeLine extends StatelessWidget {
+  const _ChangeLine(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final style = inter(14, weight: FontWeight.w500, color: t.ink);
+    final parts = text.split(' → ');
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: [
+          for (final (i, part) in parts.indexed) ...[
+            if (i > 0)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: SvgIcon(Ico.arrowRight, size: 14, color: t.muted),
+                ),
+              ),
+            TextSpan(text: part),
+          ],
+        ],
+      ),
+      semanticsLabel: text.replaceAll(' → ', ' to '),
     );
   }
 }
