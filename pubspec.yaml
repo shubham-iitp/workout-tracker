@@ -30,6 +30,10 @@ dependencies:
   path_provider: ^2.1.6
   intl: ^0.20.3
   flutter_svg: ^2.5.0
+  google_sign_in: ^7.2.0
+  googleapis: ^19.0.0
+  extension_google_sign_in_as_googleapis_auth: ^3.0.0
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +45,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/google.png
 
   fonts:
     - family: SpaceGrotesk

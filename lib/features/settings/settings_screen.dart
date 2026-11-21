@@ -7,6 +7,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../data/csv_backup_service.dart';
 import '../../widgets/ui.dart';
+import 'drive_section.dart';
 import 'import_sheet.dart';
 
 /// Banner under "Your data" after an export / import.
@@ -308,6 +309,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            const DriveSection(),
           ],
         ),
       ),
