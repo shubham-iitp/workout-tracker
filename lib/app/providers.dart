@@ -230,7 +230,12 @@ class DriveBackupNotifier extends Notifier<DriveState> {
 
   /// "Back up now" (interactive) or the automatic upload after a workout.
   Future<void> backupNow({bool interactive = true}) async {
-    if (!state.connected || state.status == DriveStatus.busy) return;
+    if (!state.connected) return;
+    if (state.status == DriveStatus.busy) {
+      // History changed mid-upload: upload once more when this one ends.
+      _again = true;
+      return;
+    }
     state = _copy(
       status: DriveStatus.busy,
       uploading: DriveBackupService.fileNameFor(DateTime.now()),
@@ -254,13 +259,21 @@ class DriveBackupNotifier extends Notifier<DriveState> {
         await _failed(f);
       }
     }
+    if (_again && _stillConnected) {
+      _again = false;
+      await backupNow(interactive: false);
+    }
   }
+
+  bool _again = false;
 
   /// False once Disconnect was tapped during an upload.
   bool get _stillConnected => _prefs.getBool(_connected) ?? false;
 
-  /// Called after a workout is saved. Never throws, never shows UI.
-  Future<void> afterWorkoutSaved() async {
+  /// Called after anything in the CSV changes: a workout saved or deleted,
+  /// plan edits saved, day count changed, a workout discarded (its +/− edits
+  /// stay in the plan), a CSV imported. Never throws, never shows UI.
+  Future<void> afterDataChanged() async {
     if (state.connected && state.auto) await backupNow(interactive: false);
   }
 

@@ -2,11 +2,15 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_tracker/app/providers.dart';
 import 'package:workout_tracker/data/csv_backup_service.dart';
+import 'package:workout_tracker/data/daos/history_dao.dart';
 import 'package:workout_tracker/data/database.dart';
 import 'package:workout_tracker/data/drive_backup_service.dart';
 
@@ -405,6 +409,59 @@ void main() {
       final f = await fail(ex(GoogleSignInExceptionCode.unknownError, '10: '));
       expect(f.kind, DriveFailureKind.signIn);
       expect(f.detail, startsWith('Error 10 (DEVELOPER_ERROR)'));
+    });
+  });
+
+  group('auto backup (Back up automatically)', () {
+    Future<ProviderContainer> connected({bool auto = true}) async {
+      SharedPreferences.setMockInitialValues({
+        'drive_connected': true,
+        'drive_auto': auto,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final c = ProviderContainer(
+        overrides: [
+          prefsProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(db),
+          driveAuthProvider.overrideWithValue(auth),
+        ],
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    int uploads() => drive.requests.where((r) => r.contains('/upload/')).length;
+
+    test('runs after a workout is deleted from History', () async {
+      final c = await connected();
+      final n = c.read(driveBackupProvider.notifier);
+      await n.afterDataChanged(); // e.g. a save
+      expect(uploads(), 1);
+
+      final sessions = await HistoryDao(db).loadSessions();
+      if (sessions.isNotEmpty) {
+        await HistoryDao(db).deleteSession(sessions.first.session.id);
+      }
+      await n.afterDataChanged(); // the delete
+      expect(uploads(), 2);
+      expect(c.read(driveBackupProvider).status, DriveStatus.on);
+    });
+
+    test('a change during an upload queues one more upload', () async {
+      final c = await connected();
+      final n = c.read(driveBackupProvider.notifier);
+      final first = n.afterDataChanged(); // save → upload starts
+      expect(c.read(driveBackupProvider).status, DriveStatus.busy);
+      await n.afterDataChanged(); // delete while busy → queued
+      await n.afterDataChanged(); // more changes → still one rerun
+      await first;
+      expect(uploads(), 2);
+    });
+
+    test('does nothing when the switch is off', () async {
+      final c = await connected(auto: false);
+      await c.read(driveBackupProvider.notifier).afterDataChanged();
+      expect(uploads(), 0);
     });
   });
 }

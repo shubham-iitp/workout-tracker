@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -84,6 +86,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
           SnackBar(content: Text('Changes to ${snapshot.name} discarded')),
         );
       } else {
+        unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
         context.pop();
         messenger.showSnackBar(
           SnackBar(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -90,6 +92,7 @@ class _RotationCard extends ConsumerWidget {
         if (!ok) return;
       }
       await dao.setDayCount(n - 1);
+      unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
     }
 
     return Container(
@@ -141,7 +144,12 @@ class _RotationCard extends ConsumerWidget {
             icon: Ico.plus,
             label: 'Add a day',
             onTap: n < AppDatabase.maxDays
-                ? () => dao.setDayCount(n + 1)
+                ? () async {
+                    await dao.setDayCount(n + 1);
+                    unawaited(
+                      ref.read(driveBackupProvider.notifier).afterDataChanged(),
+                    );
+                  }
                 : null,
             background: t.accent,
             color: t.ink,

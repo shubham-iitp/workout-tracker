@@ -247,12 +247,12 @@ class _ConnectedCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Back up after every workout',
+                        'Back up automatically',
                         style: inter(14, weight: FontWeight.w600, color: t.ink),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Uploads a fresh CSV when a workout is saved.',
+                        'Uploads a fresh CSV after every workout and whenever your plan or history changes.',
                         style: inter(12, color: t.muted),
                       ),
                     ],
