@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -7,6 +9,7 @@ import '../../app/providers.dart';
 import '../../app/theme.dart';
 import '../../data/csv_backup_service.dart';
 import '../../widgets/ui.dart';
+import 'drive_section.dart';
 import 'import_sheet.dart';
 
 /// Banner under "Your data" after an export / import.
@@ -74,6 +77,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await showImportSheet(context, preview);
       if (!ok) return;
       await service.replaceAll(preview.data);
+      unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
       final d = preview.data;
       setState(() {
         _formatOpen = false;
@@ -308,6 +312,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            const DriveSection(),
           ],
         ),
       ),

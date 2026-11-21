@@ -78,6 +78,8 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
   Future<int> _save(ActiveWorkout active, WorkoutProgress progress) async {
     final id = await ref.read(workoutDaoProvider).save(progress, active);
     ref.read(expandedSessionProvider.notifier).set(id);
+    // Background upload to Drive; never blocks the Complete / History screen.
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
     return id;
   }
 
@@ -114,6 +116,9 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen> {
 
   Future<void> _discard() async {
     await ref.read(workoutDaoProvider).discard();
+    // Weight / reps changed with +/− are kept in the plan even when the
+    // workout is thrown away.
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
     if (mounted) context.go(Routes.workouts);
   }
 

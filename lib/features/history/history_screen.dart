@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -306,6 +307,10 @@ class _SessionCard extends ConsumerWidget {
                 );
                 if (ok) {
                   await ref.read(historyDaoProvider).deleteSession(s.id);
+                  // Same auto backup as after saving a workout.
+                  unawaited(
+                    ref.read(driveBackupProvider.notifier).afterDataChanged(),
+                  );
                 }
               },
               child: Padding(
