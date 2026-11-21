@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -174,6 +176,85 @@ class _Stat extends StatelessWidget {
   }
 }
 
+/// Pill for a partial workout: a small progress ring + "N%". Shown in place
+/// of the "N up" tag.
+class _PartialPill extends StatelessWidget {
+  const _PartialPill(this.pct);
+
+  final int pct;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Semantics(
+      label: 'Partial workout, $pct% done',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
+        decoration: BoxDecoration(
+          color: t.line,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomPaint(
+              size: const Size.square(16),
+              painter: _RingPainter(
+                fraction: pct / 100,
+                track: t.checkIdle,
+                arc: t.ink,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '$pct%',
+              style: inter(12, weight: FontWeight.w700, color: t.ink),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// r = 6, stroke 2.5 in a 16×16 box; the arc starts at 12 o'clock.
+class _RingPainter extends CustomPainter {
+  _RingPainter({
+    required this.fraction,
+    required this.track,
+    required this.arc,
+  });
+
+  final double fraction;
+  final Color track;
+  final Color arc;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: 6);
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    canvas.drawOval(rect, stroke..color = track);
+    if (fraction > 0) {
+      canvas.drawArc(
+        rect,
+        -math.pi / 2,
+        2 * math.pi * fraction,
+        false,
+        stroke
+          ..color = arc
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.fraction != fraction || old.track != track || old.arc != arc;
+}
+
 class _SessionCard extends ConsumerWidget {
   const _SessionCard({
     required this.view,
@@ -285,7 +366,10 @@ class _SessionCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (view.liftsUp > 0) ...[
+                    if (view.isPartial) ...[
+                      const SizedBox(width: 14),
+                      _PartialPill(view.completionPct),
+                    ] else if (view.liftsUp > 0) ...[
                       const SizedBox(width: 14),
                       UpPill(
                         '${view.liftsUp} up',

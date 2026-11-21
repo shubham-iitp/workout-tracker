@@ -68,6 +68,18 @@ class SessionView {
   int get setsDone => exercises.fold(0, (n, e) => n + e.sets.length);
   int get liftsUp => exercises.where((e) => e.exercise.improved).length;
 
+  /// Completion, 0–100: done ÷ planned items, counting warm-up items, sets
+  /// and cool-down items together. 100 when nothing was planned.
+  int get completionPct {
+    final planned = session.warmTotal + session.totalSets + session.coolTotal;
+    if (planned <= 0) return 100;
+    final done = session.warmDone + setsDone + session.coolDone;
+    return (done * 100 / planned).round().clamp(0, 100);
+  }
+
+  /// Quit or finished early.
+  bool get isPartial => completionPct < 100;
+
   /// Σ weight × reps, in kg.
   double get volumeKg => exercises.fold(
     0.0,
