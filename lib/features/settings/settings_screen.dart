@@ -101,14 +101,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _savedName = null;
   });
 
-  void _pickPreset(AppPalette p) {
+  // The selected palette is in the backup (its `theme` row), so a change
+  // uploads like any other edit.
+  Future<void> _pickPreset(AppPalette p) async {
     _clearRandom();
-    ref.read(settingsProvider.notifier).setPalette(p);
+    if (ref.read(settingsProvider).isSelected(p)) return;
+    await ref.read(settingsProvider.notifier).setPalette(p);
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
   }
 
-  void _pickSaved(SavedPalette p) {
+  Future<void> _pickSaved(SavedPalette p) async {
     _clearRandom();
-    ref.read(settingsProvider.notifier).useSaved(p);
+    if (ref.read(settingsProvider).isSelectedSaved(p)) return;
+    await ref.read(settingsProvider.notifier).useSaved(p);
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
   }
 
   Future<void> _export() async {
@@ -141,6 +147,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await showImportSheet(context, preview);
       if (!ok) return;
       await service.replaceAll(preview.data);
+      if (preview.data.selectedPalette case final name?) {
+        await ref.read(settingsProvider.notifier).restoreSelection(name);
+      }
       unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
       final d = preview.data;
       setState(() {

@@ -108,6 +108,56 @@ void main() {
     });
   });
 
+  String file(List<String> rows) => '${[header, ...rows].join('\n')}\n';
+  String theme([String? name]) => row({'type': 'theme', 'exercise': ?name});
+
+  group('selected palette (theme row)', () {
+    test('round-trips; preset names are matched case-insensitively', () {
+      final saved = BackupData(
+        days: [],
+        sessions: [],
+        palettes: [
+          BackupPalette(
+            name: 'Sunset',
+            scheme: seven.scheme,
+            hue: seven.hue,
+            colors: seven.colors,
+          ),
+        ],
+        selectedPalette: 'Sunset',
+      );
+      final csv = encodeBackup(saved);
+      expect(csv, endsWith('${theme('Sunset')}\n'));
+      expect(decodeBackup(csv).selectedPalette, 'Sunset');
+      expect(encodeBackup(decodeBackup(csv)), csv);
+
+      final themed = '$sample${theme('ocean BLUE')}\n';
+      expect(decodeBackup(themed).selectedPalette, 'Ocean blue');
+      expect(decodeBackup(sample).selectedPalette, isNull);
+    });
+
+    test('the palette row may come after the theme row', () {
+      final csv = file([theme('sunset'), paletteRow('Sunset', seven)]);
+      expect(decodeBackup(csv).selectedPalette, 'Sunset');
+    });
+
+    test('bad theme rows are rejected', () {
+      expect(
+        expectError(file([theme('Nope')])),
+        "Row 2 selects palette 'Nope', which is not a built-in palette or a "
+        'palette row in the file',
+      );
+      expect(
+        expectError(file([theme('Lime'), theme('Lime')])),
+        'Row 3 is a second theme row; a file selects one palette',
+      );
+      expect(
+        expectError(file([theme()])),
+        'Row 2 has no value in the exercise column',
+      );
+    });
+  });
+
   group('database', () {
     late AppDatabase db;
     late PaletteDao dao;
@@ -153,6 +203,16 @@ void main() {
       expect(restored.map((p) => p.name), ['Sunset', 'Deep sea']);
       expect(restored.first.colors, seven.colors);
       expect(encodeBackup(await CsvBackupService(other).snapshot()), exported);
+    });
+
+    test('export writes the selected palette', () async {
+      await dao.save('Sunset', seven);
+      var selected = 'Lime';
+      final withTheme = CsvBackupService(db, selectedPalette: () => selected);
+      expect((await withTheme.snapshot()).selectedPalette, 'Lime');
+      selected = 'Sunset';
+      final csv = encodeBackup(await withTheme.snapshot());
+      expect(decodeBackup(csv).selectedPalette, 'Sunset');
     });
 
     test('import replaces saved palettes', () async {

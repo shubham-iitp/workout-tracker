@@ -232,7 +232,10 @@ void main() {
   });
 
   group('Day editor asks before leaving with unsaved changes', () {
-    Future<(AppDatabase, int)> openEditor(WidgetTester t) async {
+    Future<(AppDatabase, int)> openEditor(
+      WidgetTester t, {
+      CountingDrive? drive,
+    }) async {
       t.view.physicalSize = const Size(390 * 3, 844 * 3);
       t.view.devicePixelRatio = 3;
       addTearDown(t.view.reset);
@@ -248,6 +251,7 @@ void main() {
           overrides: [
             prefsProvider.overrideWithValue(prefs),
             databaseProvider.overrideWithValue(db),
+            if (drive != null) driveBackupProvider.overrideWith(() => drive),
           ],
           child: const WorkoutTrackerApp(),
         ),
@@ -339,6 +343,85 @@ void main() {
       expect(savedReps, 12);
       await done(t);
     });
+
+    Future<void> editReps(WidgetTester t) async {
+      final reps = find.byWidgetPredicate(
+        (w) => w is SyncedField && w.semanticLabel == 'Bench press set 1 reps',
+      );
+      await t.enterText(
+        find.descendant(of: reps, matching: find.byType(TextField)),
+        '12',
+      );
+      await settle(t);
+    }
+
+    Future<void> background(WidgetTester t) async {
+      for (final s in [AppLifecycleState.inactive, AppLifecycleState.hidden]) {
+        t.binding.handleAppLifecycleStateChanged(s);
+      }
+      await settle(t);
+    }
+
+    Future<void> foreground(WidgetTester t) async {
+      for (final s in [AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+        t.binding.handleAppLifecycleStateChanged(s);
+      }
+      await settle(t);
+    }
+
+    testWidgets('leaving the app uploads unsaved edits once; discard '
+        'uploads again', (t) async {
+      final drive = CountingDrive();
+      await openEditor(t, drive: drive);
+      await background(t);
+      expect(drive.calls, 0, reason: 'no edits yet');
+      await foreground(t);
+
+      await editReps(t);
+      await background(t);
+      expect(drive.calls, 1);
+      await foreground(t);
+      await background(t);
+      expect(drive.calls, 1, reason: 'nothing new since the last upload');
+      await foreground(t);
+
+      await tapBack(t);
+      await t.tap(find.text('Discard changes'));
+      await settle(t);
+      expect(drive.calls, 2, reason: 'Drive had the discarded edits');
+      await done(t);
+    });
+
+    testWidgets('Start Day uploads unsaved edits', (t) async {
+      final drive = CountingDrive();
+      await openEditor(t, drive: drive);
+      await editReps(t);
+      final start = find.text('Start Day 1');
+      await t.scrollUntilVisible(
+        start,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.tap(start);
+      await settle(t);
+      expect(drive.calls, 1);
+      await done(t);
+    });
+
+    testWidgets('Start Day without edits does not upload', (t) async {
+      final drive = CountingDrive();
+      await openEditor(t, drive: drive);
+      final start = find.text('Start Day 1');
+      await t.scrollUntilVisible(
+        start,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.tap(start);
+      await settle(t);
+      expect(drive.calls, 0);
+      await done(t);
+    });
   });
 
   testWidgets('random palette: roll, preview, name, save, select', (t) async {
@@ -417,6 +500,14 @@ void main() {
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 1));
   });
+}
+
+/// Counts automatic backups instead of talking to Drive.
+class CountingDrive extends DriveBackupNotifier {
+  var calls = 0;
+
+  @override
+  Future<void> afterDataChanged() async => calls++;
 }
 
 Future<void> settle(WidgetTester t) async {

@@ -38,6 +38,7 @@ class BackupData {
     required this.days,
     required this.sessions,
     List<BackupPalette>? palettes,
+    this.selectedPalette,
   }) : palettes = palettes ?? [];
 
   final List<BackupDay> days;
@@ -46,6 +47,10 @@ class BackupData {
   /// Saved random palettes, in list order.
   final List<BackupPalette> palettes;
   int get paletteCount => palettes.length;
+
+  /// The palette the app uses: a preset's name ("Ocean blue") or one of
+  /// [palettes]. Null in files from before it was backed up.
+  final String? selectedPalette;
 
   int get dayCount => days.length;
   int get exerciseCount => days.fold(
@@ -288,6 +293,9 @@ String encodeBackup(BackupData data) {
       row({'type': 'palette', 'exercise': p.name, 'detail': p.encodeDetail()}),
     );
   }
+  if (data.selectedPalette case final name?) {
+    rows.add(row({'type': 'theme', 'exercise': name}));
+  }
 
   final out = StringBuffer();
   for (final r in rows) {
@@ -403,6 +411,8 @@ BackupData decodeBackup(String text) {
   final sessions = <BackupSession>[];
   final sessionById = <String, BackupSession>{};
   final palettes = <BackupPalette>[];
+  String? selected;
+  var selectedRow = 0;
 
   for (var i = 1; i < rows.length; i++) {
     final r = _Row(rows[i], i + 1);
@@ -558,6 +568,17 @@ BackupData decodeBackup(String text) {
         }
         palettes.add(_paletteDetail(r, name));
 
+      case 'theme':
+        final name = r.required('exercise');
+        if (selected != null) {
+          throw CsvFormatException(
+            'Row ${r.number} is a second theme row; '
+            'a file selects one palette',
+          );
+        }
+        selected = name;
+        selectedRow = r.number;
+
       case '':
         throw CsvFormatException(
           'Row ${r.number} has no value in the type column',
@@ -570,7 +591,29 @@ BackupData decodeBackup(String text) {
     }
   }
 
-  return BackupData(days: days, sessions: sessions, palettes: palettes);
+  // Checked after every row: the palette row may come after the theme row.
+  if (selected != null) {
+    final preset = presetPaletteNames
+        .where((p) => samePaletteName(p, selected!))
+        .firstOrNull;
+    final saved = palettes
+        .where((p) => samePaletteName(p.name, selected!))
+        .firstOrNull;
+    if (preset == null && saved == null) {
+      throw CsvFormatException(
+        "Row $selectedRow selects palette '$selected', "
+        'which is not a built-in palette or a palette row in the file',
+      );
+    }
+    selected = preset ?? saved!.name;
+  }
+
+  return BackupData(
+    days: days,
+    sessions: sessions,
+    palettes: palettes,
+    selectedPalette: selected,
+  );
 }
 
 /// Parses a `palette` row's `detail` cell (see [BackupPalette]).

@@ -47,9 +47,13 @@ class ImportFailure implements Exception {
 
 /// Moves the whole plan + history to and from the CSV format (spec §5).
 class CsvBackupService {
-  CsvBackupService(this.db);
+  CsvBackupService(this.db, {this.selectedPalette});
 
   final AppDatabase db;
+
+  /// Name of the palette the app uses right now (kept in settings, not the
+  /// database), written to the file's `theme` row.
+  final String? Function()? selectedPalette;
 
   // ---- Database -> BackupData -------------------------------------------------
 
@@ -125,6 +129,7 @@ class CsvBackupService {
             colors: p.colors,
           ),
       ],
+      selectedPalette: selectedPalette?.call(),
     );
   }
 

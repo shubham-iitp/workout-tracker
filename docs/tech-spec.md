@@ -78,7 +78,7 @@ Added in schema version 2 (the upgrade creates the table; nothing else changes).
 
 ### Settings (shared_preferences)
 - `unit`: `kg` | `lb` (convert for display; always store kg)
-- `theme`: `lime` (#C8F03C, default) | `ocean` | `gold` | `rose` (Rosewood & aqua: accent #8EE3EF, dark #254E70, badges #C33C54, "up" #37718E, background #EEFBF8, text #142B3E) | `custom` (a saved palette: `theme_custom` = its name, `theme_colors` = its colours as JSON, cached so the app opens in it without waiting for the database). If the saved palette disappears (e.g. an import without it), the app falls back to Lime.
+- `theme`: `lime` (#C8F03C, default) | `ocean` | `gold` | `rose` (Rosewood & aqua: accent #8EE3EF, dark #254E70, badges #C33C54, "up" #37718E, background #EEFBF8, text #142B3E) | `custom` (a saved palette: `theme_custom` = its name, `theme_colors` = its colours as JSON, cached so the app opens in it without waiting for the database). If the saved palette disappears (e.g. an import without it), the app falls back to Lime. The selection is also written to the CSV (`theme` row, §5) and restored by Import.
 - Each theme is one full set of colour tokens (ink, dark, badge, ground, muted, line, border, accent, up…); screens only use tokens, never raw colours.
 - Drive backup (§6): `drive_connected` (bool), `drive_account` (email, display only), `drive_folder_id` (id of the "Workout" folder), `drive_auto` (bool, default `true`), `drive_last_at` (ISO time of last successful upload), `drive_last_bytes` (int), `drive_last_file` (name of the last uploaded file), `drive_last_error` (string, nullable). No tokens are stored by the app; `google_sign_in` keeps them in Google Play services.
 
@@ -116,7 +116,7 @@ Designs: canvas page "Random palette · Settings → Colour palette", artboards 
 - **Preview card**: "Previewing a random palette", the scheme + base hue, five swatches (ground, ink, dark, accent, badge) with hex codes, "Not saved yet…", **Save this palette** / **Back to Lime**. The preview themes the whole Settings screen. It isn't saved: leaving Settings drops it and the last saved palette comes back.
 - **Save this palette** → bottom sheet "Name this palette" (7.3): the swatches, a name field (prefilled "My palette N", max 24 characters, counter), **Save palette** / **Cancel**. Empty names and the preset names (case-insensitive) can't be saved. A name that matches a saved palette shows "You already have a palette called …. Saving will replace it." and the button reads **Replace palette** (7.4); replacing keeps its place in the list.
 - After saving, the palette appears in the list under its name, selected, with "Saved as “Sunset”. Pick it any time from the list above." (7.6). Every screen uses it (7.7–7.9).
-- **Storage**: table `custom_palette` (§2). The selected palette is a preference (§2 Settings). Saved palettes are part of the CSV (§5, `palette` rows), so **Export**, **Import** and **Backup on Drive** (§6) include them; saving one triggers the auto backup.
+- **Storage**: table `custom_palette` (§2). The selected palette is a preference (§2 Settings). Saved palettes and the selected palette are part of the CSV (§5, `palette` rows and one `theme` row), so **Export**, **Import** and **Backup on Drive** (§6) include them; saving one, or picking a different palette, triggers the auto backup.
 
 ## 5. Export / import (CSV)
 
@@ -147,6 +147,7 @@ type,day,section,body_part,exercise,set,weight_kg,reps,detail,video_url,last_wei
 | `session` | session_id, started_at (ISO 8601), minutes, day (day name at the time), body_part (parts label at the time, e.g. "Chest & Triceps"), set (total planned sets), warm_done, warm_total, cool_done, cool_total |
 | `session_set` | session_id, exercise, set, weight_kg, reps, improved (`true`/`false`, same for every set of that exercise) |
 | `palette` | exercise (saved palette name), detail (`scheme=analogous;hue=4;ink=#…;dark=#…;…`, all 17 colour tokens, §4.1). Written after the history rows; files without any still import. |
+| `theme` | exercise (the selected palette: a preset's name, e.g. `Ocean blue`, or a saved palette's name). At most one, written last. Import selects it; files without one keep the current selection. |
 
 Rules: body parts and exercises are created in the order they first appear; `session_set` rows must follow their `session` row's `session_id`; quote any cell containing a comma (or a double quote, doubled as `""`). Row numbers in error messages count the header as row 1.
 
@@ -212,12 +213,14 @@ Other cases that must fail with a row + column message:
 | Two `palette` rows with the same name | "Row 21 repeats palette 'Sunset'; palette names must be unique" |
 | `palette` named like a preset | "Row 20 uses the built-in palette name 'Lime'" |
 | `palette` colour missing / not `#RRGGBB` | "Row 20 has 'red' as the ink colour in the detail column" |
+| `theme` names neither a preset nor a `palette` row in the file | "Row 22 selects palette 'Sunset', which is not a built-in palette or a palette row in the file" |
+| Two `theme` rows | "Row 23 is a second theme row; a file selects one palette" |
 
 ## 6. Backup on Google Drive
 
 Designs: canvas page "Sync with Google", artboards 1–5 (`DriveOff`, `DriveOn`, `DriveBusy`, `DriveError`, `DriveSigninError`). It is a new section at the bottom of Settings, under "Your data".
 
-**What it does:** it creates a folder called **Workout** in the user's My Drive and uploads the same CSV that Export CSV writes (plan, history and saved palettes) (`workout-tracker-YYYY-MM-DD.csv`, §5). It is a one-way backup: phone → Drive. Restoring is done by downloading the file from Drive and using Import CSV. There's no automatic restore or two-way sync.
+**What it does:** it creates a folder called **Workout** in the user's My Drive and uploads the same CSV that Export CSV writes (plan, history, saved palettes and the selected palette) (`workout-tracker-YYYY-MM-DD.csv`, §5). It is a one-way backup: phone → Drive. Restoring is done by downloading the file from Drive and using Import CSV. There's no automatic restore or two-way sync.
 
 ### 6.1 States (from the design)
 
@@ -240,7 +243,7 @@ Designs: canvas page "Sync with Google", artboards 1–5 (`DriveOff`, `DriveOn`,
    2. Look in the folder for today's file name. If it exists, `files.update` its content; if not, `files.create` it with `parents = [drive_folder_id]` and `mimeType = text/csv`. Result: one file per day, holding the latest data for that day.
    3. On success, save `drive_last_at` and `drive_last_bytes` and clear `drive_last_error`.
    4. If the saved folder id returns 404 (the user deleted or trashed it), clear the id, re-run step 1.2 and retry once.
-3. **Auto backup:** after anything in the CSV changes: a session saved (full or partial), a workout deleted from History, the day editor closed with **Save**, a day added or removed on Workouts, a workout discarded (its +/− weight and reps stay in the plan), a random palette saved (§4.1), or a CSV imported. Day-editor **Discard** puts the day back as it was, so it uploads nothing. Then, if `drive_connected && drive_auto` is true, start a backup in the background. Never block or delay the Complete / History screen. On failure, store the error and show the **Error** state in Settings; nothing on the phone changes, and the next saved workout retries.
+3. **Auto backup:** after anything in the CSV changes: a session saved (full or partial), a workout deleted from History, the day editor closed with **Save**, a day added or removed on Workouts, a workout discarded (its +/− weight and reps stay in the plan), a random palette saved or a different palette picked (§4.1), or a CSV imported. Day-editor edits are written to the database as you type, so they also upload, once, when the app goes to the background with the editor open, and when **Start Day N** leaves the editor without the save sheet. Day-editor **Discard** puts the day back as it was: it uploads nothing unless the edits already reached Drive that way, in which case it uploads again to undo them. Then, if `drive_connected && drive_auto` is true, start a backup in the background. Never block or delay the Complete / History screen. On failure, store the error and show the **Error** state in Settings; nothing on the phone changes, and the next saved workout retries.
 4. **Disconnect:** `GoogleSignIn.disconnect()`, which revokes access. Clear all `drive_*` prefs and go back to **Off**. Files already on Drive stay there.
 5. **Errors to map to a message:** no internet (`SocketException`) → the design's message. Sign-in cancelled → stay **Off**, no error. Token expired (401) → clear the cached token and retry once. Still 401, a 403 `insufficientPermissions`, or no token available without UI during an auto backup → "Google Drive access was removed. Tap Back up now to connect again." (stays connected; Back up now is interactive and shows Google's consent again). Sign-in cancelled (12501) → stays **Off**, nothing shown. Any other sign-in failure → stays **Off** with the box from state 5 under the button: "Couldn't sign in to Google", the retry hint, and the platform code + message in monospace; Error 10 / [28444] reads "Error 10 (DEVELOPER_ERROR): the app's SHA-1 or package name doesn't match its Google OAuth client." Drive full (403 `storageQuotaExceeded`) → "Your Google Drive is full."
 
@@ -250,7 +253,7 @@ Designs: canvas page "Sync with Google", artboards 1–5 (`DriveOff`, `DriveOn`,
 - `lib/data/drive_backup_service.dart`: `DriveAuth` (interface) + `GoogleDriveAuth` (google_sign_in); `DriveBackupService.connect()` / `backup()` / `disconnect()` on the `googleapis` `DriveApi`, taking `CsvBackupService` for the CSV bytes; `DriveFailure` maps errors to the messages above.
 - `lib/app/providers.dart`: `driveBackupProvider` (`DriveBackupNotifier`) holds the state (`off` / `on` / `busy` / `error`) and the prefs above; `afterDataChanged()` runs the auto backup; a change that lands mid-upload queues one more upload.
 - `lib/features/settings/drive_section.dart`: the "Backup on Drive" section (4 states), placed at the bottom of Settings. The switch is token-coloured (`dark` on, `border2` off). Google "G" = `assets/images/google.png` (24×24). Disconnect works immediately, even mid-upload (the upload's result is then ignored).
-- Call sites, each firing `afterDataChanged()` without awaiting it: active workout `_save()` and `_discard()`, History delete (long-press → Delete), day editor Save, Workouts +/− day, Settings Import, Settings palette save.
+- Call sites, each firing `afterDataChanged()` without awaiting it: active workout `_save()` and `_discard()`, History delete (long-press → Delete), day editor Save (and Discard after a background upload), day editor `_backupUnsaved()` (app hidden via `AppLifecycleListener`, and **Start Day N**; skipped when the day matches what was last uploaded), Workouts +/− day, Settings Import, Settings palette save and palette pick.
 - `test/drive_backup_test.dart`: an in-memory fake Drive behind `MockClient`. Covers new vs reused folder, create vs update today's file, next-day file, trashed/deleted folder recovery, 401 retry, access removed, Drive full and offline.
 
 ### 6.4 Setup outside the code (one-time)

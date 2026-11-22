@@ -32,7 +32,10 @@ final workoutDaoProvider = Provider(
   (ref) => WorkoutDao(ref.watch(databaseProvider)),
 );
 final backupServiceProvider = Provider(
-  (ref) => CsvBackupService(ref.watch(databaseProvider)),
+  (ref) => CsvBackupService(
+    ref.watch(databaseProvider),
+    selectedPalette: () => ref.read(settingsProvider).selectedName,
+  ),
 );
 
 final planProvider = StreamProvider<List<DayPlan>>(
@@ -76,6 +79,10 @@ class AppSettings {
 
   /// The colours every screen uses.
   final AppTokens tokens;
+
+  /// What the backup's `theme` row holds: a preset's label or the saved
+  /// palette's name.
+  String get selectedName => customName ?? preset!.label;
 
   bool isSelected(AppPalette p) => preset == p;
   bool isSelectedSaved(SavedPalette s) =>
@@ -169,6 +176,17 @@ class SettingsNotifier extends Notifier<AppSettings> {
       _customColorsKey,
       encodePaletteColors(palette.colors),
     );
+  }
+
+  /// Selects the palette a CSV import names ([AppSettings.selectedName]).
+  /// A name that matches nothing leaves the selection as it is.
+  Future<void> restoreSelection(String name) async {
+    for (final p in AppPalette.values) {
+      if (samePaletteName(p.label, name)) return setPalette(p);
+    }
+    final saved = await ref.read(paletteDaoProvider).loadAll();
+    final match = saved.where((p) => samePaletteName(p.name, name)).firstOrNull;
+    if (match != null) await useSaved(match);
   }
 
   void _reconcile(List<SavedPalette> saved) {
