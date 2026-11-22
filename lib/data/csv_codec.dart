@@ -2,6 +2,8 @@
 /// Flutter imports, so it can be unit-tested on its own.
 library;
 
+import '../app/random_palette.dart';
+
 const csvColumns = [
   'type',
   'day',
@@ -32,10 +34,18 @@ const maxBackupDays = 14;
 // ---------------------------------------------------------------------------
 
 class BackupData {
-  BackupData({required this.days, required this.sessions});
+  BackupData({
+    required this.days,
+    required this.sessions,
+    List<BackupPalette>? palettes,
+  }) : palettes = palettes ?? [];
 
   final List<BackupDay> days;
   final List<BackupSession> sessions;
+
+  /// Saved random palettes, in list order.
+  final List<BackupPalette> palettes;
+  int get paletteCount => palettes.length;
 
   int get dayCount => days.length;
   int get exerciseCount => days.fold(
@@ -145,6 +155,29 @@ class BackupSessionSet {
   final int reps;
 }
 
+/// A saved random palette. In the file it is one `palette` row: the name in
+/// the `exercise` column and every colour in `detail` as
+/// `scheme=analogous;hue=4;ink=#2B1A19;dark=#…;…` (no commas, so no quoting).
+class BackupPalette {
+  BackupPalette({
+    required this.name,
+    required this.scheme,
+    required this.hue,
+    required this.colors,
+  });
+
+  final String name;
+  final String scheme;
+  final int hue;
+  final PaletteColors colors;
+
+  String encodeDetail() => [
+    'scheme=$scheme',
+    'hue=$hue',
+    for (final k in paletteTokenKeys) '$k=${colors[k]}',
+  ].join(';');
+}
+
 /// Import failed. [message] names the row and column, e.g.
 /// "Row 14 has no value in the reps column".
 class CsvFormatException implements Exception {
@@ -249,6 +282,11 @@ String encodeBackup(BackupData data) {
         );
       }
     }
+  }
+  for (final p in data.palettes) {
+    rows.add(
+      row({'type': 'palette', 'exercise': p.name, 'detail': p.encodeDetail()}),
+    );
   }
 
   final out = StringBuffer();
@@ -364,6 +402,7 @@ BackupData decodeBackup(String text) {
   final exerciseByKey = <String, BackupExercise>{};
   final sessions = <BackupSession>[];
   final sessionById = <String, BackupSession>{};
+  final palettes = <BackupPalette>[];
 
   for (var i = 1; i < rows.length; i++) {
     final r = _Row(rows[i], i + 1);
@@ -498,6 +537,27 @@ BackupData decodeBackup(String text) {
         }
         exercise.sets.add(set);
 
+      case 'palette':
+        final name = r.required('exercise');
+        if (name.length > maxPaletteNameLength) {
+          throw CsvFormatException(
+            "Row ${r.number} has palette name '$name'; "
+            'names are up to $maxPaletteNameLength characters',
+          );
+        }
+        if (isPresetPaletteName(name)) {
+          throw CsvFormatException(
+            "Row ${r.number} uses the built-in palette name '$name'",
+          );
+        }
+        if (palettes.any((p) => samePaletteName(p.name, name))) {
+          throw CsvFormatException(
+            "Row ${r.number} repeats palette '$name'; "
+            'palette names must be unique',
+          );
+        }
+        palettes.add(_paletteDetail(r, name));
+
       case '':
         throw CsvFormatException(
           'Row ${r.number} has no value in the type column',
@@ -510,7 +570,57 @@ BackupData decodeBackup(String text) {
     }
   }
 
-  return BackupData(days: days, sessions: sessions);
+  return BackupData(days: days, sessions: sessions, palettes: palettes);
+}
+
+/// Parses a `palette` row's `detail` cell (see [BackupPalette]).
+BackupPalette _paletteDetail(_Row r, String name) {
+  final detail = r.required('detail');
+  final values = <String, String>{};
+  for (final part in detail.split(';')) {
+    final eq = part.indexOf('=');
+    if (eq <= 0) {
+      throw CsvFormatException(
+        "Row ${r.number} has '$part' in the detail column; "
+        'expected key=value pairs',
+      );
+    }
+    values[part.substring(0, eq).trim()] = part.substring(eq + 1).trim();
+  }
+
+  final scheme = values['scheme'] ?? '';
+  if (!paletteSchemes.contains(scheme)) {
+    throw CsvFormatException(
+      "Row ${r.number} has scheme '$scheme' in the detail column",
+    );
+  }
+  final hue = int.tryParse(values['hue'] ?? '');
+  if (hue == null || hue < 0 || hue > 359) {
+    throw CsvFormatException(
+      "Row ${r.number} has hue '${values['hue'] ?? ''}' in the detail column",
+    );
+  }
+  final colors = <String, String>{};
+  for (final k in paletteTokenKeys) {
+    final v = (values[k] ?? '').toUpperCase();
+    if (v.isEmpty) {
+      throw CsvFormatException(
+        'Row ${r.number} has no $k colour in the detail column',
+      );
+    }
+    if (!isPaletteHex(v)) {
+      throw CsvFormatException(
+        "Row ${r.number} has '${values[k]}' as the $k colour in the detail column",
+      );
+    }
+    colors[k] = v;
+  }
+  return BackupPalette(
+    name: name,
+    scheme: scheme,
+    hue: hue,
+    colors: PaletteColors(colors),
+  );
 }
 
 bool _isHeader(List<String> row) {

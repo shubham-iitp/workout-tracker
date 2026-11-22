@@ -18,6 +18,7 @@ import 'package:workout_tracker/app/providers.dart';
 import 'package:workout_tracker/app/router.dart';
 import 'package:workout_tracker/data/csv_backup_service.dart';
 import 'package:workout_tracker/data/csv_codec.dart';
+import 'package:workout_tracker/data/daos/palette_dao.dart';
 import 'package:workout_tracker/data/daos/plan_dao.dart';
 import 'package:workout_tracker/data/daos/workout_dao.dart';
 import 'package:workout_tracker/data/database.dart';
@@ -338,6 +339,83 @@ void main() {
       expect(savedReps, 12);
       await done(t);
     });
+  });
+
+  testWidgets('random palette: roll, preview, name, save, select', (t) async {
+    t.view.physicalSize = const Size(390 * 3, 1320 * 3);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final db = await seeded(t);
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [
+          prefsProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(db),
+        ],
+        child: const WorkoutTrackerApp(),
+      ),
+    );
+    appRouter.go(Routes.workouts);
+    await settle(t);
+    appRouter.push(Routes.settings);
+    await settle(t);
+
+    await t.tap(find.text('Random palette'));
+    await settle(t);
+    expect(find.text('Previewing a random palette'), findsOneWidget);
+    expect(find.text('Roll again'), findsOneWidget);
+    await t.tap(find.text('Roll again'));
+    await settle(t);
+    expect(find.text('Previewing a random palette'), findsOneWidget);
+    if (autoUpdateGoldenFiles) {
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('../build/screens/10-random-preview.png'),
+      );
+    }
+
+    await t.ensureVisible(find.text('Save this palette'));
+    await t.tap(find.text('Save this palette'));
+    await settle(t);
+    expect(find.text('Name this palette'), findsOneWidget);
+    expect(find.text('My palette 1'), findsOneWidget);
+
+    // A preset name can't be saved.
+    await t.enterText(find.byType(TextField).last, 'Lime');
+    await settle(t);
+    expect(find.textContaining('used by a built-in palette'), findsOneWidget);
+
+    await t.enterText(find.byType(TextField).last, 'Sunset');
+    await settle(t);
+    await t.tap(find.text('Save palette'));
+    await settle(t);
+
+    expect(find.text('Name this palette'), findsNothing);
+    expect(find.text('Previewing a random palette'), findsNothing);
+    expect(find.textContaining('Saved as “Sunset”'), findsOneWidget);
+    expect(find.text('Sunset'), findsOneWidget);
+    expect(prefs.getString('theme'), 'custom');
+    expect(prefs.getString('theme_custom'), 'Sunset');
+
+    late List<String> names;
+    late String csv;
+    await t.runAsync(() async {
+      names = [for (final p in await PaletteDao(db).loadAll()) p.name];
+      csv = encodeBackup(await CsvBackupService(db).snapshot());
+    });
+    expect(names, ['Sunset']);
+    expect(csv, contains('palette,,,,Sunset,'));
+
+    // Back to a preset: the saved palette stays in the list.
+    await t.tap(find.text('Ocean blue'));
+    await settle(t);
+    expect(prefs.getString('theme'), 'ocean');
+    expect(find.text('Sunset'), findsOneWidget);
+
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
   });
 }
 

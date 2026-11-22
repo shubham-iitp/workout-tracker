@@ -3540,6 +3540,402 @@ class ActiveWorkoutsCompanion extends UpdateCompanion<ActiveWorkout> {
   }
 }
 
+class $CustomPalettesTable extends CustomPalettes
+    with TableInfo<$CustomPalettesTable, CustomPaletteRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomPalettesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _schemeMeta = const VerificationMeta('scheme');
+  @override
+  late final GeneratedColumn<String> scheme = GeneratedColumn<String>(
+    'scheme',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hueMeta = const VerificationMeta('hue');
+  @override
+  late final GeneratedColumn<int> hue = GeneratedColumn<int>(
+    'hue',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _colorsMeta = const VerificationMeta('colors');
+  @override
+  late final GeneratedColumn<String> colors = GeneratedColumn<String>(
+    'colors',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    position,
+    name,
+    scheme,
+    hue,
+    colors,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'custom_palette';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CustomPaletteRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('scheme')) {
+      context.handle(
+        _schemeMeta,
+        scheme.isAcceptableOrUnknown(data['scheme']!, _schemeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_schemeMeta);
+    }
+    if (data.containsKey('hue')) {
+      context.handle(
+        _hueMeta,
+        hue.isAcceptableOrUnknown(data['hue']!, _hueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_hueMeta);
+    }
+    if (data.containsKey('colors')) {
+      context.handle(
+        _colorsMeta,
+        colors.isAcceptableOrUnknown(data['colors']!, _colorsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_colorsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CustomPaletteRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomPaletteRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      scheme: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}scheme'],
+      )!,
+      hue: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hue'],
+      )!,
+      colors: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}colors'],
+      )!,
+    );
+  }
+
+  @override
+  $CustomPalettesTable createAlias(String alias) {
+    return $CustomPalettesTable(attachedDatabase, alias);
+  }
+}
+
+class CustomPaletteRow extends DataClass
+    implements Insertable<CustomPaletteRow> {
+  final int id;
+  final int position;
+  final String name;
+
+  /// `analogous` | `complementary` | `triad`.
+  final String scheme;
+  final int hue;
+
+  /// JSON object: every key of `paletteTokenKeys` → `#RRGGBB`.
+  final String colors;
+  const CustomPaletteRow({
+    required this.id,
+    required this.position,
+    required this.name,
+    required this.scheme,
+    required this.hue,
+    required this.colors,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['position'] = Variable<int>(position);
+    map['name'] = Variable<String>(name);
+    map['scheme'] = Variable<String>(scheme);
+    map['hue'] = Variable<int>(hue);
+    map['colors'] = Variable<String>(colors);
+    return map;
+  }
+
+  CustomPalettesCompanion toCompanion(bool nullToAbsent) {
+    return CustomPalettesCompanion(
+      id: Value(id),
+      position: Value(position),
+      name: Value(name),
+      scheme: Value(scheme),
+      hue: Value(hue),
+      colors: Value(colors),
+    );
+  }
+
+  factory CustomPaletteRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomPaletteRow(
+      id: serializer.fromJson<int>(json['id']),
+      position: serializer.fromJson<int>(json['position']),
+      name: serializer.fromJson<String>(json['name']),
+      scheme: serializer.fromJson<String>(json['scheme']),
+      hue: serializer.fromJson<int>(json['hue']),
+      colors: serializer.fromJson<String>(json['colors']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'position': serializer.toJson<int>(position),
+      'name': serializer.toJson<String>(name),
+      'scheme': serializer.toJson<String>(scheme),
+      'hue': serializer.toJson<int>(hue),
+      'colors': serializer.toJson<String>(colors),
+    };
+  }
+
+  CustomPaletteRow copyWith({
+    int? id,
+    int? position,
+    String? name,
+    String? scheme,
+    int? hue,
+    String? colors,
+  }) => CustomPaletteRow(
+    id: id ?? this.id,
+    position: position ?? this.position,
+    name: name ?? this.name,
+    scheme: scheme ?? this.scheme,
+    hue: hue ?? this.hue,
+    colors: colors ?? this.colors,
+  );
+  CustomPaletteRow copyWithCompanion(CustomPalettesCompanion data) {
+    return CustomPaletteRow(
+      id: data.id.present ? data.id.value : this.id,
+      position: data.position.present ? data.position.value : this.position,
+      name: data.name.present ? data.name.value : this.name,
+      scheme: data.scheme.present ? data.scheme.value : this.scheme,
+      hue: data.hue.present ? data.hue.value : this.hue,
+      colors: data.colors.present ? data.colors.value : this.colors,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomPaletteRow(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('name: $name, ')
+          ..write('scheme: $scheme, ')
+          ..write('hue: $hue, ')
+          ..write('colors: $colors')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, position, name, scheme, hue, colors);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomPaletteRow &&
+          other.id == this.id &&
+          other.position == this.position &&
+          other.name == this.name &&
+          other.scheme == this.scheme &&
+          other.hue == this.hue &&
+          other.colors == this.colors);
+}
+
+class CustomPalettesCompanion extends UpdateCompanion<CustomPaletteRow> {
+  final Value<int> id;
+  final Value<int> position;
+  final Value<String> name;
+  final Value<String> scheme;
+  final Value<int> hue;
+  final Value<String> colors;
+  const CustomPalettesCompanion({
+    this.id = const Value.absent(),
+    this.position = const Value.absent(),
+    this.name = const Value.absent(),
+    this.scheme = const Value.absent(),
+    this.hue = const Value.absent(),
+    this.colors = const Value.absent(),
+  });
+  CustomPalettesCompanion.insert({
+    this.id = const Value.absent(),
+    required int position,
+    required String name,
+    required String scheme,
+    required int hue,
+    required String colors,
+  }) : position = Value(position),
+       name = Value(name),
+       scheme = Value(scheme),
+       hue = Value(hue),
+       colors = Value(colors);
+  static Insertable<CustomPaletteRow> custom({
+    Expression<int>? id,
+    Expression<int>? position,
+    Expression<String>? name,
+    Expression<String>? scheme,
+    Expression<int>? hue,
+    Expression<String>? colors,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (position != null) 'position': position,
+      if (name != null) 'name': name,
+      if (scheme != null) 'scheme': scheme,
+      if (hue != null) 'hue': hue,
+      if (colors != null) 'colors': colors,
+    });
+  }
+
+  CustomPalettesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? position,
+    Value<String>? name,
+    Value<String>? scheme,
+    Value<int>? hue,
+    Value<String>? colors,
+  }) {
+    return CustomPalettesCompanion(
+      id: id ?? this.id,
+      position: position ?? this.position,
+      name: name ?? this.name,
+      scheme: scheme ?? this.scheme,
+      hue: hue ?? this.hue,
+      colors: colors ?? this.colors,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (scheme.present) {
+      map['scheme'] = Variable<String>(scheme.value);
+    }
+    if (hue.present) {
+      map['hue'] = Variable<int>(hue.value);
+    }
+    if (colors.present) {
+      map['colors'] = Variable<String>(colors.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomPalettesCompanion(')
+          ..write('id: $id, ')
+          ..write('position: $position, ')
+          ..write('name: $name, ')
+          ..write('scheme: $scheme, ')
+          ..write('hue: $hue, ')
+          ..write('colors: $colors')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3554,6 +3950,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SessionSetsTable sessionSets = $SessionSetsTable(this);
   late final $ActiveWorkoutsTable activeWorkouts = $ActiveWorkoutsTable(this);
+  late final $CustomPalettesTable customPalettes = $CustomPalettesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3568,6 +3965,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     sessionExercises,
     sessionSets,
     activeWorkouts,
+    customPalettes,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -7210,6 +7608,234 @@ typedef $$ActiveWorkoutsTableProcessedTableManager =
       ActiveWorkout,
       PrefetchHooks Function({bool dayId})
     >;
+typedef $$CustomPalettesTableCreateCompanionBuilder =
+    CustomPalettesCompanion Function({
+      Value<int> id,
+      required int position,
+      required String name,
+      required String scheme,
+      required int hue,
+      required String colors,
+    });
+typedef $$CustomPalettesTableUpdateCompanionBuilder =
+    CustomPalettesCompanion Function({
+      Value<int> id,
+      Value<int> position,
+      Value<String> name,
+      Value<String> scheme,
+      Value<int> hue,
+      Value<String> colors,
+    });
+
+class $$CustomPalettesTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomPalettesTable> {
+  $$CustomPalettesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get scheme => $composableBuilder(
+    column: $table.scheme,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hue => $composableBuilder(
+    column: $table.hue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colors => $composableBuilder(
+    column: $table.colors,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CustomPalettesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomPalettesTable> {
+  $$CustomPalettesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get scheme => $composableBuilder(
+    column: $table.scheme,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hue => $composableBuilder(
+    column: $table.hue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colors => $composableBuilder(
+    column: $table.colors,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CustomPalettesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomPalettesTable> {
+  $$CustomPalettesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get scheme =>
+      $composableBuilder(column: $table.scheme, builder: (column) => column);
+
+  GeneratedColumn<int> get hue =>
+      $composableBuilder(column: $table.hue, builder: (column) => column);
+
+  GeneratedColumn<String> get colors =>
+      $composableBuilder(column: $table.colors, builder: (column) => column);
+}
+
+class $$CustomPalettesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CustomPalettesTable,
+          CustomPaletteRow,
+          $$CustomPalettesTableFilterComposer,
+          $$CustomPalettesTableOrderingComposer,
+          $$CustomPalettesTableAnnotationComposer,
+          $$CustomPalettesTableCreateCompanionBuilder,
+          $$CustomPalettesTableUpdateCompanionBuilder,
+          (
+            CustomPaletteRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CustomPalettesTable,
+              CustomPaletteRow
+            >,
+          ),
+          CustomPaletteRow,
+          PrefetchHooks Function()
+        > {
+  $$CustomPalettesTableTableManager(
+    _$AppDatabase db,
+    $CustomPalettesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomPalettesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomPalettesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomPalettesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> scheme = const Value.absent(),
+                Value<int> hue = const Value.absent(),
+                Value<String> colors = const Value.absent(),
+              }) => CustomPalettesCompanion(
+                id: id,
+                position: position,
+                name: name,
+                scheme: scheme,
+                hue: hue,
+                colors: colors,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int position,
+                required String name,
+                required String scheme,
+                required int hue,
+                required String colors,
+              }) => CustomPalettesCompanion.insert(
+                id: id,
+                position: position,
+                name: name,
+                scheme: scheme,
+                hue: hue,
+                colors: colors,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CustomPalettesTable, CustomPaletteRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CustomPalettesTable,
+                    CustomPaletteRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CustomPalettesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CustomPalettesTable,
+      CustomPaletteRow,
+      $$CustomPalettesTableFilterComposer,
+      $$CustomPalettesTableOrderingComposer,
+      $$CustomPalettesTableAnnotationComposer,
+      $$CustomPalettesTableCreateCompanionBuilder,
+      $$CustomPalettesTableUpdateCompanionBuilder,
+      (
+        CustomPaletteRow,
+        BaseReferences<_$AppDatabase, $CustomPalettesTable, CustomPaletteRow>,
+      ),
+      CustomPaletteRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7232,4 +7858,6 @@ class $AppDatabaseManager {
       $$SessionSetsTableTableManager(_db, _db.sessionSets);
   $$ActiveWorkoutsTableTableManager get activeWorkouts =>
       $$ActiveWorkoutsTableTableManager(_db, _db.activeWorkouts);
+  $$CustomPalettesTableTableManager get customPalettes =>
+      $$CustomPalettesTableTableManager(_db, _db.customPalettes);
 }

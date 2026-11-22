@@ -16,6 +16,7 @@ Future<bool> showImportSheet(
     ('Exercises', '${d.exerciseCount} (${d.setCount} sets)'),
     ('Warm-up / cool-down items', '${d.warmupCount + d.cooldownCount}'),
     ('Workouts in history', '${d.sessionCount}'),
+    if (d.paletteCount > 0) ('Saved palettes', '${d.paletteCount}'),
   ];
 
   final result = await showDesignSheet<bool>(
@@ -107,7 +108,7 @@ Future<bool> showImportSheet(
           ),
           const SizedBox(height: 12),
           Text(
-            'This replaces your current plan and history. '
+            'This replaces your current plan, history and saved palettes. '
             'Export first if you want to keep a copy.',
             style: inter(13, color: Fixed.dangerTitle),
           ),

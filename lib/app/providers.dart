@@ -3,12 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/csv_backup_service.dart';
 import '../data/daos/history_dao.dart';
+import '../data/daos/palette_dao.dart';
 import '../data/daos/plan_dao.dart';
 import '../data/daos/workout_dao.dart';
 import '../data/database.dart';
 import '../data/drive_backup_service.dart';
 import '../data/models.dart';
 import 'format.dart';
+import 'random_palette.dart';
 import 'theme.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -47,28 +49,92 @@ final activeWorkoutProvider = StreamProvider<ActiveWorkout?>(
 
 // ---- Settings ---------------------------------------------------------------
 
+final paletteDaoProvider = Provider(
+  (ref) => PaletteDao(ref.watch(databaseProvider)),
+);
+
+/// Saved random palettes, in list order.
+final savedPalettesProvider = StreamProvider<List<SavedPalette>>(
+  (ref) => ref.watch(paletteDaoProvider).watchAll(),
+);
+
 class AppSettings {
-  const AppSettings({required this.unit, required this.palette});
+  const AppSettings({
+    required this.unit,
+    required this.preset,
+    required this.customName,
+    required this.tokens,
+  });
 
   final WeightUnit unit;
-  final AppPalette palette;
 
-  AppSettings copyWith({WeightUnit? unit, AppPalette? palette}) =>
-      AppSettings(unit: unit ?? this.unit, palette: palette ?? this.palette);
+  /// The selected preset, or null when a saved palette is selected.
+  final AppPalette? preset;
+
+  /// Name of the selected saved palette (null when a preset is selected).
+  final String? customName;
+
+  /// The colours every screen uses.
+  final AppTokens tokens;
+
+  bool isSelected(AppPalette p) => preset == p;
+  bool isSelectedSaved(SavedPalette s) =>
+      customName != null && samePaletteName(customName!, s.name);
+
+  AppSettings copyWith({WeightUnit? unit}) => AppSettings(
+    unit: unit ?? this.unit,
+    preset: preset,
+    customName: customName,
+    tokens: tokens,
+  );
 }
 
 class SettingsNotifier extends Notifier<AppSettings> {
   static const _unitKey = 'unit';
+
+  /// A preset name (`lime`, `ocean`, …) or `custom`.
   static const _themeKey = 'theme';
+
+  /// The selected saved palette's name and colours. The colours are cached
+  /// here so the app opens in them without waiting for the database.
+  static const _customNameKey = 'theme_custom';
+  static const _customColorsKey = 'theme_colors';
 
   SharedPreferences get _prefs => ref.read(prefsProvider);
 
   @override
   AppSettings build() {
     final prefs = ref.watch(prefsProvider);
+    // Keep the selected saved palette in step with the database: replaced
+    // by a new save under the same name, or gone after a CSV import.
+    ref.listen(savedPalettesProvider, (_, next) {
+      final list = next.value;
+      if (list != null) _reconcile(list);
+    });
+
+    final unit = WeightUnit.fromName(prefs.getString(_unitKey));
+    if (prefs.getString(_themeKey) == 'custom') {
+      final name = prefs.getString(_customNameKey);
+      final cached = prefs.getString(_customColorsKey);
+      if (name != null && cached != null) {
+        try {
+          return AppSettings(
+            unit: unit,
+            preset: null,
+            customName: name,
+            tokens: AppTokens.fromColors(decodePaletteColors(cached)),
+          );
+        } catch (_) {
+          // Corrupt cache: fall back to Lime below.
+        }
+      }
+    }
+    final preset = AppPalette.fromName(prefs.getString(_themeKey));
     return AppSettings(
-      unit: WeightUnit.fromName(prefs.getString(_unitKey)),
-      palette: AppPalette.fromName(prefs.getString(_themeKey)),
+      unit: unit,
+      preset: preset,
+      customName: null,
+      tokens: preset.tokens,
     );
   }
 
@@ -78,8 +144,44 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   Future<void> setPalette(AppPalette palette) async {
-    state = state.copyWith(palette: palette);
+    state = AppSettings(
+      unit: state.unit,
+      preset: palette,
+      customName: null,
+      tokens: palette.tokens,
+    );
     await _prefs.setString(_themeKey, palette.name);
+    await _prefs.remove(_customNameKey);
+    await _prefs.remove(_customColorsKey);
+  }
+
+  /// Uses a saved random palette for the whole app.
+  Future<void> useSaved(SavedPalette palette) async {
+    state = AppSettings(
+      unit: state.unit,
+      preset: null,
+      customName: palette.name,
+      tokens: AppTokens.fromColors(palette.colors),
+    );
+    await _prefs.setString(_themeKey, 'custom');
+    await _prefs.setString(_customNameKey, palette.name);
+    await _prefs.setString(
+      _customColorsKey,
+      encodePaletteColors(palette.colors),
+    );
+  }
+
+  void _reconcile(List<SavedPalette> saved) {
+    final name = state.customName;
+    if (name == null) return;
+    final match = saved.where((p) => samePaletteName(p.name, name)).firstOrNull;
+    if (match == null) {
+      setPalette(AppPalette.lime);
+    } else if (encodePaletteColors(match.colors) !=
+            _prefs.getString(_customColorsKey) ||
+        match.name != name) {
+      useSaved(match);
+    }
   }
 }
 

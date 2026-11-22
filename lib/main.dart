@@ -22,11 +22,11 @@ class WorkoutTrackerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = ref.watch(settingsProvider.select((s) => s.palette));
+    final tokens = ref.watch(settingsProvider.select((s) => s.tokens));
     return MaterialApp.router(
       title: 'Workout Tracker',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(palette),
+      theme: buildTheme(tokens),
       routerConfig: appRouter,
     );
   }

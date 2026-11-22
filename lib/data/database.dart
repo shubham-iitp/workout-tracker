@@ -157,6 +157,30 @@ class ActiveWorkouts extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// ---------------------------------------------------------------------------
+// Saved random palettes (Settings → Colour palette → Random palette)
+// ---------------------------------------------------------------------------
+
+/// A palette the user generated and saved under a name. Names are unique
+/// (case-insensitive) and never a preset's name; saving the same name again
+/// replaces the colours in place.
+@DataClassName('CustomPaletteRow')
+class CustomPalettes extends Table {
+  @override
+  String get tableName => 'custom_palette';
+
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get position => integer()();
+  TextColumn get name => text()();
+
+  /// `analogous` | `complementary` | `triad`.
+  TextColumn get scheme => text()();
+  IntColumn get hue => integer()();
+
+  /// JSON object: every key of `paletteTokenKeys` → `#RRGGBB`.
+  TextColumn get colors => text()();
+}
+
 abstract final class RoutineKind {
   static const warmup = 'warmup';
   static const cooldown = 'cooldown';
@@ -180,6 +204,7 @@ abstract final class Phase {
     SessionExercises,
     SessionSets,
     ActiveWorkouts,
+    CustomPalettes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -191,7 +216,7 @@ class AppDatabase extends _$AppDatabase {
   static const defaultDays = 3;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -202,6 +227,10 @@ class AppDatabase extends _$AppDatabase {
           splitDays,
         ).insert(SplitDaysCompanion.insert(position: i, name: 'Day ${i + 1}'));
       }
+    },
+    onUpgrade: (m, from, to) async {
+      // v2: saved random palettes.
+      if (from < 2) await m.createTable(customPalettes);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

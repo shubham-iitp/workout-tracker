@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'random_palette.dart';
+
 /// The four colour palettes from the design canvas ("Workout Tracker",
 /// MainThemed artboard). Screens only use [AppTokens], never raw colours.
 enum AppPalette {
@@ -134,8 +136,34 @@ abstract final class Fixed {
   static const dangerTitle = Color(0xFF8A1C12);
 }
 
+/// `#RRGGBB` → opaque [Color].
+Color hexColor(String hex) =>
+    Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
+
 @immutable
 class AppTokens extends ThemeExtension<AppTokens> {
+  /// Tokens for a generated or saved random palette.
+  factory AppTokens.fromColors(PaletteColors c) => AppTokens(
+    ink: hexColor(c['ink']),
+    dark: hexColor(c['dark']),
+    badge: hexColor(c['badge']),
+    ground: hexColor(c['ground']),
+    muted: hexColor(c['muted']),
+    line: hexColor(c['line']),
+    border: hexColor(c['border']),
+    border2: hexColor(c['border2']),
+    divider: hexColor(c['divider']),
+    field: hexColor(c['field']),
+    darkMuted: hexColor(c['darkMuted']),
+    darkText: hexColor(c['darkText']),
+    darkTrack: hexColor(c['darkTrack']),
+    darkLine: hexColor(c['darkLine']),
+    checkIdle: hexColor(c['checkIdle']),
+    up: hexColor(c['up']),
+    accent: hexColor(c['accent']),
+    swatches: [for (final s in c.swatches) hexColor(s)],
+  );
+
   const AppTokens({
     required this.ink,
     required this.dark,
@@ -227,8 +255,7 @@ TextStyle inter(
   decoration: decoration,
 );
 
-ThemeData buildTheme(AppPalette palette) {
-  final t = palette.tokens;
+ThemeData buildTheme(AppTokens t) {
   return ThemeData(
     useMaterial3: true,
     fontFamily: bodyFont,
