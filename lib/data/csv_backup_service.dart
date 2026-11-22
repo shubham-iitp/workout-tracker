@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app/format.dart';
 import 'csv_codec.dart';
 import 'daos/history_dao.dart';
+import 'daos/palette_dao.dart';
 import 'daos/plan_dao.dart';
 import 'database.dart';
 
@@ -46,15 +47,20 @@ class ImportFailure implements Exception {
 
 /// Moves the whole plan + history to and from the CSV format (spec §5).
 class CsvBackupService {
-  CsvBackupService(this.db);
+  CsvBackupService(this.db, {this.selectedPalette});
 
   final AppDatabase db;
+
+  /// Name of the palette the app uses right now (kept in settings, not the
+  /// database), written to the file's `theme` row.
+  final String? Function()? selectedPalette;
 
   // ---- Database -> BackupData -------------------------------------------------
 
   Future<BackupData> snapshot() async {
     final plan = await PlanDao(db).loadPlan();
     final sessions = await HistoryDao(db).loadSessions();
+    final palettes = await PaletteDao(db).loadAll();
 
     final days = <BackupDay>[];
     for (final d in plan) {
@@ -114,6 +120,16 @@ class CsvBackupService {
                   ),
             ]),
       ],
+      palettes: [
+        for (final p in palettes)
+          BackupPalette(
+            name: p.name,
+            scheme: p.scheme,
+            hue: p.hue,
+            colors: p.colors,
+          ),
+      ],
+      selectedPalette: selectedPalette?.call(),
     );
   }
 
@@ -122,13 +138,29 @@ class CsvBackupService {
 
   // ---- BackupData -> Database -------------------------------------------------
 
-  /// Replaces the current plan, history and any in-progress workout with
-  /// [data], in one transaction.
+  /// Replaces the current plan, history, saved palettes and any in-progress
+  /// workout with [data], in one transaction.
   Future<void> replaceAll(BackupData data) async {
     await db.transaction(() async {
       await db.delete(db.activeWorkouts).go();
       await db.delete(db.sessions).go(); // cascades to exercises / sets
       await db.delete(db.splitDays).go(); // cascades to the whole plan
+      await db.delete(db.customPalettes).go();
+
+      for (var i = 0; i < data.palettes.length; i++) {
+        final p = data.palettes[i];
+        await db
+            .into(db.customPalettes)
+            .insert(
+              CustomPalettesCompanion.insert(
+                position: i,
+                name: p.name,
+                scheme: p.scheme,
+                hue: p.hue,
+                colors: encodePaletteColors(p.colors),
+              ),
+            );
+      }
 
       final dayIds = <String, int>{};
       for (var di = 0; di < data.days.length; di++) {
@@ -308,20 +340,28 @@ class CsvBackupService {
   }
 }
 
-/// "2 days, 3 exercises and 1 workout".
-String summaryShort(BackupData d) =>
-    '${plural(d.dayCount, 'day')}, ${plural(d.exerciseCount, 'exercise')} '
-    'and ${plural(d.sessionCount, 'workout')}';
+/// "2 days, 3 exercises and 1 workout" (+ ", … and 2 saved palettes" when
+/// there are any).
+String summaryShort(BackupData d) {
+  final parts = [
+    plural(d.dayCount, 'day'),
+    plural(d.exerciseCount, 'exercise'),
+    plural(d.sessionCount, 'workout'),
+    if (d.paletteCount > 0) plural(d.paletteCount, 'saved palette'),
+  ];
+  return '${parts.sublist(0, parts.length - 1).join(', ')} and ${parts.last}';
+}
 
 /// "2 days · 3 exercises, 6 sets · 2 warm-up + 1 cool-down items ·
-/// 1 workout in history".
+/// 1 workout in history" (+ " · 2 saved palettes" when there are any).
 String summaryLong(BackupData d) {
   final routines = d.warmupCount + d.cooldownCount;
   return '${plural(d.dayCount, 'day')} · '
       '${plural(d.exerciseCount, 'exercise')}, ${plural(d.setCount, 'set')} · '
       '${d.warmupCount} warm-up + ${d.cooldownCount} cool-down '
       '${routines == 1 ? 'item' : 'items'} · '
-      '${plural(d.sessionCount, 'workout')} in history';
+      '${plural(d.sessionCount, 'workout')} in history'
+      '${d.paletteCount > 0 ? ' · ${plural(d.paletteCount, 'saved palette')}' : ''}';
 }
 
 String fmtBytes(int bytes) {

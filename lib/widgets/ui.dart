@@ -42,6 +42,10 @@ enum Ico {
   ),
   dumbbell('<path d="M6 7v10M3 9.5v5M18 7v10M21 9.5v5M6 12h12"/>'),
   clock('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  // Pips drawn as tiny stroked circles so they take the icon's one colour.
+  dice(
+    '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r=".5"/><circle cx="15.5" cy="8.5" r=".5"/><circle cx="12" cy="12" r=".5"/><circle cx="8.5" cy="15.5" r=".5"/><circle cx="15.5" cy="15.5" r=".5"/>',
+  ),
   alert('<path d="M12 7v6M12 17h.01"/>');
 
   const Ico(this.body, {this.filled = false});

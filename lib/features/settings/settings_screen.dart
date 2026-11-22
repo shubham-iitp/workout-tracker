@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,11 +7,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/format.dart';
 import '../../app/providers.dart';
+import '../../app/random_palette.dart';
 import '../../app/theme.dart';
 import '../../data/csv_backup_service.dart';
+import '../../data/daos/palette_dao.dart';
 import '../../widgets/ui.dart';
 import 'drive_section.dart';
 import 'import_sheet.dart';
+import 'palette_name_sheet.dart';
 
 /// Banner under "Your data" after an export / import.
 class _Banner {
@@ -33,6 +37,7 @@ const _rowTypes = [
     'session_id, started_at, minutes, day, warm_done, warm_total, cool_done, cool_total',
   ),
   ('session_set', 'session_id, exercise, set, weight_kg, reps, improved'),
+  ('palette', 'exercise (palette name), detail (scheme, hue and colours)'),
 ];
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -46,6 +51,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   _Banner? _banner;
   bool _busy = false;
   bool _formatOpen = false;
+
+  // ---- Random palette (design canvas page "Random palette") -----------------
+  // The preview lives only on this screen: the whole Settings screen is
+  // themed with it, and leaving Settings drops it (back to the saved palette).
+  final _random = math.Random();
+  GeneratedPalette? _preview;
+  bool _rollFailed = false;
+  String? _savedName;
+
+  void _roll() {
+    final p = generatePalette(seededRandom(_random.nextInt(1 << 32)));
+    setState(() {
+      if (p == null) {
+        _rollFailed = true; // keep whatever is showing
+      } else {
+        _preview = p;
+        _rollFailed = false;
+        _savedName = null;
+      }
+    });
+  }
+
+  Future<void> _savePreview() async {
+    final preview = _preview;
+    if (preview == null) return;
+    final saved = await ref.read(paletteDaoProvider).loadAll();
+    if (!mounted) return;
+    final name = await showPaletteNameSheet(
+      context,
+      palette: preview,
+      saved: saved,
+    );
+    if (name == null || !mounted) return;
+    final row = await ref.read(paletteDaoProvider).save(name, preview);
+    await ref.read(settingsProvider.notifier).useSaved(row);
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
+    if (!mounted) return;
+    setState(() {
+      _preview = null;
+      _rollFailed = false;
+      _savedName = row.name;
+    });
+  }
+
+  void _clearRandom() => setState(() {
+    _preview = null;
+    _rollFailed = false;
+    _savedName = null;
+  });
+
+  // The selected palette is in the backup (its `theme` row), so a change
+  // uploads like any other edit.
+  Future<void> _pickPreset(AppPalette p) async {
+    _clearRandom();
+    if (ref.read(settingsProvider).isSelected(p)) return;
+    await ref.read(settingsProvider.notifier).setPalette(p);
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
+  }
+
+  Future<void> _pickSaved(SavedPalette p) async {
+    _clearRandom();
+    if (ref.read(settingsProvider).isSelectedSaved(p)) return;
+    await ref.read(settingsProvider.notifier).useSaved(p);
+    unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
+  }
 
   Future<void> _export() async {
     setState(() => _busy = true);
@@ -77,6 +147,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await showImportSheet(context, preview);
       if (!ok) return;
       await service.replaceAll(preview.data);
+      if (preview.data.selectedPalette case final name?) {
+        await ref.read(settingsProvider.notifier).restoreSelection(name);
+      }
       unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
       final d = preview.data;
       setState(() {
@@ -86,7 +159,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           body:
               'Your plan now has ${plural(d.dayCount, 'day')} and '
               '${plural(d.exerciseCount, 'exercise')}, and history has '
-              '${plural(d.sessionCount, 'workout')}.',
+              '${plural(d.sessionCount, 'workout')}.'
+              '${d.paletteCount > 0 ? ' ${plural(d.paletteCount, 'saved palette')} restored.' : ''}',
         );
       });
     } on ImportFailure catch (e) {
@@ -113,9 +187,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final preview = _preview;
+    if (preview == null) return _body(context);
+    // "The whole app is using it now": everything visible is this screen.
+    return Theme(
+      data: buildTheme(AppTokens.fromColors(preview.colors)),
+      child: Builder(builder: _body),
+    );
+  }
+
+  Widget _body(BuildContext context) {
     final t = context.tokens;
     final settings = ref.watch(settingsProvider);
+    final saved = ref.watch(savedPalettesProvider).value ?? const [];
     final notifier = ref.read(settingsProvider.notifier);
+    final previewing = _preview != null;
     final h2 = inter(
       12,
       weight: FontWeight.w700,
@@ -152,13 +238,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 10),
             for (final p in AppPalette.values) ...[
               _PaletteOption(
-                palette: p,
-                selected: p == settings.palette,
-                onTap: () => notifier.setPalette(p),
+                label: p.label,
+                tokens: p.tokens,
+                selected: !previewing && settings.isSelected(p),
+                onTap: () => _pickPreset(p),
               ),
               const SizedBox(height: 8),
             ],
-            const SizedBox(height: 8),
+            for (final p in saved) ...[
+              _PaletteOption(
+                label: p.name,
+                tokens: AppTokens.fromColors(p.colors),
+                selected: !previewing && settings.isSelectedSaved(p),
+                onTap: () => _pickSaved(p),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Btn(
+              onTap: _roll,
+              height: 52,
+              color: Fixed.white,
+              dashed: true,
+              border: BorderSide(color: t.border2, width: 1.5),
+              child: BtnLabel(
+                previewing ? 'Roll again' : 'Random palette',
+                gap: 10,
+                style: inter(15, weight: FontWeight.w600, color: t.ink),
+                leading: SvgIcon(Ico.dice, color: t.ink, stroke: 2),
+              ),
+            ),
+            if (_rollFailed) ...[
+              const SizedBox(height: 10),
+              _Note(
+                text: "Couldn't find a readable palette, try again.",
+                error: true,
+              ),
+            ],
+            if (_savedName != null && !previewing) ...[
+              const SizedBox(height: 10),
+              _Note(
+                text:
+                    'Saved as “$_savedName”. Pick it any time from the list above.',
+              ),
+            ],
+            if (_preview case final pv?) ...[
+              const SizedBox(height: 10),
+              _PreviewCard(
+                palette: pv,
+                onSave: _savePreview,
+                onBackToLime: () => _pickPreset(AppPalette.lime),
+              ),
+            ],
+            const SizedBox(height: 16),
             sectionTitle('Weight unit'),
             const SizedBox(height: 10),
             Container(
@@ -321,25 +452,214 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
+/// Status / error line under the Random palette button.
+class _Note extends StatelessWidget {
+  const _Note({required this.text, this.error = false});
+
+  final String text;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: error ? Fixed.dangerBg : Fixed.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: error ? Fixed.dangerBorder : t.line),
+        ),
+        child: Row(
+          children: [
+            if (!error) ...[
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: t.up, shape: BoxShape.circle),
+                child: const SvgIcon(
+                  Ico.check,
+                  size: 11,
+                  color: Fixed.white,
+                  stroke: 3.4,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                text,
+                style: inter(13, color: error ? Fixed.dangerTitle : t.ink),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Previewing a random palette" card (design 7.2 / 7.5).
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({
+    required this.palette,
+    required this.onSave,
+    required this.onBackToLime,
+  });
+
+  final GeneratedPalette palette;
+  final VoidCallback onSave;
+  final VoidCallback onBackToLime;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final swatches = palette.colors.swatches;
+    return Semantics(
+      container: true,
+      label: 'Random palette preview',
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Fixed.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: t.ink, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Previewing a random palette',
+                    style: inter(15, weight: FontWeight.w700, color: t.ink),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(palette.label, style: inter(12, color: t.muted)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < swatches.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: Semantics(
+                      label: '${swatchRoles[i]} ${swatches[i]}',
+                      excludeSemantics: true,
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: hexColor(swatches[i]),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0x1F000000),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              swatches[i],
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: t.ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            swatchRoles[i],
+                            style: inter(10, color: t.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The whole app is using it now. Not saved yet: leaving '
+              'Settings goes back to your last saved palette.',
+              style: inter(12, color: t.muted),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Btn(
+                    onTap: onSave,
+                    height: 48,
+                    radius: 12,
+                    color: t.dark,
+                    child: Text(
+                      'Save this palette',
+                      style: inter(
+                        14,
+                        weight: FontWeight.w600,
+                        color: Fixed.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Btn(
+                    onTap: onBackToLime,
+                    height: 48,
+                    radius: 12,
+                    color: Fixed.white,
+                    border: BorderSide(color: t.border),
+                    child: Text(
+                      'Back to Lime',
+                      style: inter(14, weight: FontWeight.w600, color: t.ink),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PaletteOption extends StatelessWidget {
   const _PaletteOption({
-    required this.palette,
+    required this.label,
+    required this.tokens,
     required this.selected,
     required this.onTap,
   });
 
-  final AppPalette palette;
+  final String label;
+  final AppTokens tokens;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final p = palette.tokens;
+    final p = tokens;
     return Semantics(
       inMutuallyExclusiveGroup: true,
       checked: selected,
-      label: palette.label,
+      label: label,
       child: Material(
         color: Fixed.white,
         shape: RoundedRectangleBorder(
@@ -416,7 +736,7 @@ class _PaletteOption extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        palette.label,
+                        label,
                         style: inter(16, weight: FontWeight.w600, color: t.ink),
                       ),
                       const SizedBox(height: 6),

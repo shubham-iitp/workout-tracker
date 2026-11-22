@@ -9,6 +9,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_tracker/app/providers.dart';
+import 'package:workout_tracker/app/random_palette.dart';
+import 'package:workout_tracker/app/theme.dart';
+import 'package:workout_tracker/data/daos/palette_dao.dart';
 import 'package:workout_tracker/data/csv_backup_service.dart';
 import 'package:workout_tracker/data/daos/history_dao.dart';
 import 'package:workout_tracker/data/database.dart';
@@ -456,6 +459,29 @@ void main() {
       await n.afterDataChanged(); // more changes → still one rerun
       await first;
       expect(uploads(), 2);
+    });
+
+    test('the uploaded CSV names the selected palette', () async {
+      final c = await connected();
+      final settings = c.read(settingsProvider.notifier);
+      final csv = c.read(backupServiceProvider);
+      expect((await csv.snapshot()).selectedPalette, 'Lime');
+
+      await settings.setPalette(AppPalette.ocean);
+      expect((await csv.snapshot()).selectedPalette, 'Ocean blue');
+
+      final sunset = await PaletteDao(db)
+          .save('Sunset', generatePalette(seededRandom(7))!);
+      await settings.useSaved(sunset);
+      expect((await csv.snapshot()).selectedPalette, 'Sunset');
+
+      // Import: the file's theme row picks the palette again.
+      await settings.restoreSelection('rosewood & AQUA');
+      expect(c.read(settingsProvider).preset, AppPalette.rose);
+      await settings.restoreSelection('sunset');
+      expect(c.read(settingsProvider).customName, 'Sunset');
+      await settings.restoreSelection('Gone');
+      expect(c.read(settingsProvider).customName, 'Sunset');
     });
 
     test('does nothing when the switch is off', () async {

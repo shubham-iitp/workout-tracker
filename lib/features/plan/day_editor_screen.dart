@@ -41,15 +41,41 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
   DayPlan? _snapshot;
   bool _leaving = false;
 
+  /// The day as last uploaded to Drive while the editor was open (the app
+  /// went to the background mid-edit). Null until that happens.
+  DayPlan? _uploaded;
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onHide: _backupUnsaved);
     ref.read(planDaoProvider).loadPlan().then((days) {
       if (!mounted) return;
       setState(
         () => _snapshot = days.where((d) => d.id == widget.dayId).firstOrNull,
       );
     });
+  }
+
+  /// The day as it is in the database now, after any edit still being written.
+  Future<DayPlan?> _current() async =>
+      (await ref.read(planDaoProvider).loadPlan())
+          .where((d) => d.id == widget.dayId)
+          .firstOrNull;
+
+  /// Uploads the edits if Drive doesn't have them yet. They are already in
+  /// the database, so leaving the app or starting the day keeps them.
+  Future<void> _backupUnsaved() async {
+    final base = _uploaded ?? _snapshot;
+    // Read before awaiting: Start replaces this screen meanwhile.
+    final unit = ref.read(unitProvider);
+    final drive = ref.read(driveBackupProvider.notifier);
+    final now = await _current();
+    if (base == null || now == null) return;
+    if (describeDayChanges(base, now, unit).isEmpty) return;
+    _uploaded = now;
+    unawaited(drive.afterDataChanged());
   }
 
   /// Back arrow / system back: no changes → leave; otherwise ask.
@@ -60,10 +86,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
       FocusScope.of(context).unfocus();
       final snapshot = _snapshot;
       final dao = ref.read(planDaoProvider);
-      // Reads after any edit still being written, so the list is complete.
-      final now = (await dao.loadPlan())
-          .where((d) => d.id == widget.dayId)
-          .firstOrNull;
+      final now = await _current();
       if (!mounted) return;
       if (snapshot == null || now == null) {
         context.pop();
@@ -80,6 +103,10 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
       final messenger = ScaffoldMessenger.of(context);
       if (choice == _Leave.discard) {
         await dao.restoreDay(snapshot);
+        // Drive got the edits when the app was backgrounded: undo them there.
+        if (_uploaded != null) {
+          unawaited(ref.read(driveBackupProvider.notifier).afterDataChanged());
+        }
         if (!mounted) return;
         context.pop();
         messenger.showSnackBar(
@@ -181,6 +208,7 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     for (final c in [
       _draftName,
       _draftSets,
@@ -309,6 +337,8 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
                     const SizedBox(height: 16),
                     Btn(
                       onTap: () async {
+                        // Starting keeps the edits without the save sheet.
+                        await _backupUnsaved();
                         await ref.read(workoutDaoProvider).start(day);
                         if (context.mounted) {
                           context.pushReplacement(Routes.workout);
