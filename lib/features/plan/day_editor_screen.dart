@@ -14,6 +14,7 @@ import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../widgets/async_view.dart';
 import '../../widgets/ui.dart';
+import 'exercise_search_sheet.dart';
 import 'plan_diff.dart';
 
 /// Edit one day: warm-up, body parts → exercises → sets, cool-down.
@@ -251,6 +252,71 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
           videoUrl: videoHref(_draftVideo.text),
         );
     setState(() => _draftFor = null);
+  }
+
+  /// Search button next to "Exercise name": reuse an exercise from anywhere
+  /// in the plan, or carry the typed text back as a new name.
+  Future<void> _openSearch(BodyPartPlan part) async {
+    final days = ref.read(planProvider).value;
+    if (days == null) return;
+    FocusScope.of(context).unfocus();
+    final unit = ref.read(unitProvider);
+    final result = await showExerciseSearch(
+      context,
+      days: days,
+      target: part,
+      unit: unit,
+    );
+    if (!mounted || result == null) return;
+    switch (result) {
+      case SearchAsNew(:final name):
+        _draftName.text = name;
+      case SearchPicked(:final entry):
+        final dao = ref.read(planDaoProvider);
+        final newId = await dao.copyExercise(
+          source: entry.exercise,
+          bodyPartId: part.id,
+        );
+        if (!mounted) return;
+        setState(() => _draftFor = null);
+        final t = context.tokens;
+        final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: SvgIcon(
+                    Ico.check,
+                    size: 12,
+                    color: t.ink,
+                    stroke: 3.4,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Added ${entry.name} to ${part.name} · '
+                    '${plural(entry.exercise.sets.length, 'set')}',
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'Undo',
+              textColor: t.accent,
+              onPressed: () => dao.deleteExercise(newId),
+            ),
+          ),
+        );
+    }
   }
 
   Future<void> _addPart() async {
@@ -706,11 +772,35 @@ class _DayEditorScreenState extends ConsumerState<DayEditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          field(
-            'Exercise name',
-            _draftName,
-            hint: 'e.g. Bench press',
-            autofocus: true,
+          Text('Exercise name', style: label),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _draftName,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: inter(15, weight: FontWeight.w500, color: t.ink),
+                  decoration: fieldDecoration(t, hint: 'e.g. Bench press'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconBtn(
+                icon: Ico.search,
+                label: 'Search your exercises',
+                onTap: () => _openSearch(part),
+                radius: 10,
+                background: t.dark,
+                color: Fixed.white,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Or tap search to reuse an exercise you already have, with its '
+            'sets and link.',
+            style: inter(12, color: t.muted),
           ),
           const SizedBox(height: 10),
           Row(

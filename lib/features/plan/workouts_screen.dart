@@ -39,27 +39,32 @@ class _WorkoutsScreenState extends ConsumerState<WorkoutsScreen> {
   @override
   Widget build(BuildContext context) {
     final plan = ref.watch(planProvider);
+    final sessions = ref.watch(historyProvider).value ?? const [];
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: AsyncView(
           value: plan,
-          builder: (days) => ListView(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-            children: [
-              ScreenHeader(
-                eyebrow: 'Your split',
-                title: 'Workouts',
-                onSettings: () => context.push(Routes.settings),
-              ),
-              const SizedBox(height: 16),
-              _RotationCard(days: days),
-              for (final day in days) ...[
+          builder: (days) {
+            final lastDayId = lastWorkoutDayId(sessions, days);
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+              children: [
+                ScreenHeader(
+                  eyebrow: 'Your split',
+                  title: 'Workouts',
+                  onSettings: () => context.push(Routes.settings),
+                ),
                 const SizedBox(height: 16),
-                _DayCard(day: day),
+                _RotationCard(days: days),
+                for (final day in days) ...[
+                  // The badged card drops 8px so its badge clears the card above.
+                  SizedBox(height: day.id == lastDayId ? 24 : 16),
+                  _DayCard(day: day, isLastDone: day.id == lastDayId),
+                ],
               ],
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -161,9 +166,12 @@ class _RotationCard extends ConsumerWidget {
 }
 
 class _DayCard extends ConsumerWidget {
-  const _DayCard({required this.day});
+  const _DayCard({required this.day, this.isLastDone = false});
 
   final DayPlan day;
+
+  /// This day's was the most recent workout (finished or not).
+  final bool isLastDone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -175,7 +183,12 @@ class _DayCard extends ConsumerWidget {
               '${plural(day.setCount, 'set')}'
         : 'Tap Set up day to add body parts';
 
-    return CardBox(
+    final card = CardBox(
+      padding: isLastDone
+          ? const EdgeInsets.fromLTRB(15, 22, 15, 15)
+          : const EdgeInsets.all(16),
+      border: isLastDone ? t.ink : null,
+      borderWidth: isLastDone ? 2 : 1,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -243,6 +256,48 @@ class _DayCard extends ConsumerWidget {
                 ),
               ],
             ],
+          ),
+        ],
+      ),
+    );
+    if (!isLastDone) return card;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        card,
+        Positioned(top: -13, left: 14, child: const LastDoneBadge()),
+      ],
+    );
+  }
+}
+
+/// Pill on the top-left edge of the day card whose workout was last
+/// completed in full. Fill = accent; text, icon and border = ink.
+class LastDoneBadge extends StatelessWidget {
+  const LastDoneBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: t.accent,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: t.ink, width: 2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(
+            child: SvgIcon(Ico.check, size: 12, color: t.ink, stroke: 3.2),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'Last workout done',
+            maxLines: 1,
+            softWrap: false,
+            style: inter(12, weight: FontWeight.w700, color: t.ink),
           ),
         ],
       ),

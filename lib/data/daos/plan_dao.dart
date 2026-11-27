@@ -217,6 +217,49 @@ class PlanDao {
     });
   }
 
+  /// Copies [source] — name, video link and every set (weight, reps and the
+  /// "last time" values) — as a new exercise at the end of [bodyPartId], in
+  /// one transaction. The copy is independent of the original. Returns the
+  /// new exercise's id.
+  Future<int> copyExercise({
+    required ExercisePlan source,
+    required int bodyPartId,
+  }) {
+    return db.transaction(() async {
+      final position = await _nextPosition(
+        db.exercises,
+        db.exercises.position,
+        db.exercises.bodyPartId.equals(bodyPartId),
+      );
+      final exerciseId = await db
+          .into(db.exercises)
+          .insert(
+            ExercisesCompanion.insert(
+              bodyPartId: bodyPartId,
+              position: position,
+              name: source.name,
+              videoUrl: Value(_blankToNull(source.videoUrl)),
+            ),
+          );
+      for (var i = 0; i < source.sets.length; i++) {
+        final s = source.sets[i];
+        await db
+            .into(db.exerciseSets)
+            .insert(
+              ExerciseSetsCompanion.insert(
+                exerciseId: exerciseId,
+                position: i,
+                weight: Value(s.weight),
+                reps: s.reps,
+                lastWeight: Value(s.lastWeight),
+                lastReps: Value(s.lastReps),
+              ),
+            );
+      }
+      return exerciseId;
+    });
+  }
+
   /// Updates only the fields given (name / video link).
   Future<void> updateExercise(int id, {String? name, String? videoUrl}) =>
       (db.update(db.exercises)..where((t) => t.id.equals(id))).write(

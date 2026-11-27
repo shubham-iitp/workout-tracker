@@ -18,6 +18,8 @@ enum Ico {
   playFilled('<path d="M7 4.5v15l12.5-7.5z"/>', filled: true),
   playSmall('<path d="M8 5v14l11-7z"/>', filled: true),
   back('<path d="M15 5l-7 7 7 7"/>'),
+  chevronRight('<path d="M9 5l7 7-7 7"/>'),
+  search('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),
   flame(
     '<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 01-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-7.5z"/>',
   ),
@@ -254,6 +256,7 @@ class CardBox extends StatelessWidget {
     this.radius = 18,
     this.color,
     this.border,
+    this.borderWidth = 1,
     this.dashed = false,
   });
 
@@ -262,6 +265,7 @@ class CardBox extends StatelessWidget {
   final double radius;
   final Color? color;
   final Color? border;
+  final double borderWidth;
   final bool dashed;
 
   @override
@@ -273,7 +277,9 @@ class CardBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? Fixed.white,
         borderRadius: BorderRadius.circular(radius),
-        border: dashed ? null : Border.all(color: border ?? t.line),
+        border: dashed
+            ? null
+            : Border.all(color: border ?? t.line, width: borderWidth),
       ),
       child: child,
     );

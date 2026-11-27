@@ -68,17 +68,18 @@ class SessionView {
   int get setsDone => exercises.fold(0, (n, e) => n + e.sets.length);
   int get liftsUp => exercises.where((e) => e.exercise.improved).length;
 
-  /// Completion, 0–100: done ÷ planned items, counting warm-up items, sets
-  /// and cool-down items together. 100 when nothing was planned.
+  /// Completion, 0–100: working sets done ÷ planned working sets. Warm-up
+  /// and cool-down items are not counted. 100 when no sets were planned.
   int get completionPct {
-    final planned = session.warmTotal + session.totalSets + session.coolTotal;
+    final planned = session.totalSets;
     if (planned <= 0) return 100;
-    final done = session.warmDone + setsDone + session.coolDone;
-    return (done * 100 / planned).round().clamp(0, 100);
+    final pct = (setsDone * 100 / planned).round().clamp(0, 100);
+    // Never show 100% while a set is still missing (e.g. 199 of 200).
+    return setsDone < planned ? pct.clamp(0, 99) : pct;
   }
 
-  /// Quit or finished early.
-  bool get isPartial => completionPct < 100;
+  /// Quit or finished early (not every working set was done).
+  bool get isPartial => setsDone < session.totalSets;
 
   /// Σ weight × reps, in kg.
   double get volumeKg => exercises.fold(
@@ -92,6 +93,27 @@ class SessionExerciseView {
 
   final SessionExercise exercise;
   final List<SessionSet> sets;
+}
+
+/// The plan day that gets the "Last workout done" badge: the day of the
+/// newest saved session, whether it was finished in full or not. Null when
+/// there is no history yet or that day no longer exists. Matches by day id,
+/// or by name for sessions whose day id was cleared (e.g. imported from CSV
+/// or the day was removed).
+int? lastWorkoutDayId(List<SessionView> sessions, List<DayPlan> days) {
+  SessionView? newest;
+  for (final s in sessions) {
+    if (newest == null ||
+        s.session.startedAt.isAfter(newest.session.startedAt) ||
+        (s.session.startedAt == newest.session.startedAt &&
+            s.session.id > newest.session.id)) {
+      newest = s;
+    }
+  }
+  if (newest == null) return null;
+  final dayId = newest.session.dayId;
+  if (dayId != null && days.any((d) => d.id == dayId)) return dayId;
+  return days.where((d) => d.name == newest!.session.dayName).firstOrNull?.id;
 }
 
 /// "A", "A & B", "A, B & C".
